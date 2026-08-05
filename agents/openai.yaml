@@ -1,0 +1,5 @@
+interface:
+  display_name: "Investor Opinion Tracker"
+  short_description: "跟踪授权博主观点并生成风险约束的交易研究"
+  default_prompt: "使用 $investor-opinion-tracker 跟踪指定博主并生成报告。"
+
