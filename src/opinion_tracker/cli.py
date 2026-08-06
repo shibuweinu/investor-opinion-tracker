@@ -25,8 +25,10 @@ def init(
     no_interactive: Annotated[bool, typer.Option("--no-interactive")] = False,
 ) -> None:
     workspace = workspace or Path.cwd()
-    settings = Settings()
-    path = settings.save(workspace)
+    path = workspace / ".investor-opinion-tracker" / "config.json"
+    settings = Settings.load(workspace) if path.exists() else Settings()
+    if not path.exists():
+        settings.save(workspace)
     landing = write_landing(workspace, settings)
     typer.echo(f"已创建配置：{path}")
     typer.echo(f"使用指南：{landing}")

@@ -1,6 +1,7 @@
 from typer.testing import CliRunner
 
 from opinion_tracker.cli import app
+from opinion_tracker.config import Settings
 from opinion_tracker.collectors.xueqiu import XueqiuCollector
 from opinion_tracker.mcp_server import build_server
 from opinion_tracker.scheduling import schedule_hint
@@ -103,6 +104,15 @@ def test_interactive_init_can_exit_without_creating_target(tmp_path):
     out = CliRunner().invoke(app, ["init", "--workspace", str(tmp_path)], input="n\n")
     assert out.exit_code == 0
     assert TaskStore(tmp_path).load().draft is None
+
+
+def test_repeated_init_preserves_existing_profile(tmp_path):
+    settings = Settings()
+    settings.trader_profile.style = "short_term"
+    settings.save(tmp_path)
+    out = CliRunner().invoke(app, ["init", "--workspace", str(tmp_path), "--no-interactive"])
+    assert out.exit_code == 0
+    assert Settings.load(tmp_path).trader_profile.style == "short_term"
 
 
 def test_schedule_hint_is_offer_only():
