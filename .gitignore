@@ -1,4 +1,5 @@
 .venv/
+.worktrees/
 build/
 dist/
 *.egg-info/
