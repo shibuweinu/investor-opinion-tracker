@@ -88,25 +88,39 @@ class MarketSnapshot(BaseModel):
 
 
 class FactEvidence(BaseModel):
-    claim: str
-    opinion_ids: list[str] = Field(min_length=1)
+    claim_ids: list[str] = Field(min_length=1)
     source_url: HttpUrl
     source_type: Literal["company", "exchange", "regulator", "government", "filing"]
     verified_at: datetime
 
 
+class ResearchClaim(BaseModel):
+    claim_id: str
+    text: str
+    kind: Literal["subjective", "factual"]
+    opinion_ids: list[str] = Field(min_length=1)
+    symbols: list[str] = Field(default_factory=list)
+
+
 class VerificationSummary(BaseModel):
     market_status: Literal["verified", "not_required", "failed"] = "failed"
+    semantic_status: Literal["verified", "unverified"] = "unverified"
     fact_status: Literal["verified", "unverified"] = "unverified"
     market_snapshots: list[MarketSnapshot] = Field(default_factory=list)
+    research_claims: list[ResearchClaim] = Field(default_factory=list)
     fact_evidence: list[FactEvidence] = Field(default_factory=list)
     errors: list[str] = Field(default_factory=list)
     uncovered_opinion_ids: list[str] = Field(default_factory=list)
+    uncovered_claim_ids: list[str] = Field(default_factory=list)
 
     @computed_field  # type: ignore[prop-decorator]
     @property
     def ready_for_final(self) -> bool:
-        return self.market_status in {"verified", "not_required"} and self.fact_status == "verified"
+        return (
+            self.market_status in {"verified", "not_required"}
+            and self.semantic_status == "verified"
+            and self.fact_status == "verified"
+        )
 
 
 class CollectionResult(BaseModel):

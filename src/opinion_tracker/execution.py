@@ -61,8 +61,10 @@ def execute_confirmed(
 必须：按博主分别总结；区分本人观点、回复、转发和上下文；比较一致与分歧；
 结合 TDX/AKShare 行情注明时间和来源；给出行业、股票、催化、风险、失效条件和原文证据链接。
 昵称或行业映射必须标记“Agent 推导”。证据不足的候选只能进入观察项。
-最终报告必须通过 `analyze-file --workspace ... --fact-evidence ...` 核验门禁；缺少行情或公司、
-交易所、监管、政府、公告等独立事实证据时只能保留 `UNVERIFIED.md`，不得写入或交付 `report.md`。
+先生成 `claims.json`：每条正式观点必须归入主观或事实主张，重点标的写入 `symbols`；再通过
+`analyze-file --workspace ... --claims ... --fact-evidence ...` 核验门禁。只有事实主张要求公司、
+交易所、监管、政府或公告等独立证据；任一门禁未通过时只能保留 `UNVERIFIED.md`，不得交付
+`report.md`。
 
 {position_rule}
 

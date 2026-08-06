@@ -28,6 +28,7 @@ def render_markdown(result: RunResult, profile: TraderProfile, generated_at: dat
 - 交易风格：{profile.style} / {profile.aggressiveness}
 - 单笔计划亏损上限：{profile.max_loss_per_trade_pct}%
 - 行情核验：{verification.market_status}
+- 语义归类：{verification.semantic_status}
 - 独立事实核验：{verification.fact_status}
 
 ## 观点摘要
