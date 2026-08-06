@@ -35,6 +35,7 @@ python3.11 -m venv .venv
 ```
 
 跟踪多位博主时可重复传入 `--user-url`；每位博主分别抓取，报告统一汇总。
+`run` 生成 `posts.json`、`evidence-pack.json` 和 `ANALYZE.md`；宿主 Agent 必须继续完成语义分析后才能交付 `report.md`。仓位建议默认关闭，只有显式传入 `--include-position-sizing` 才开启后续询问。
 
 随时运行 `opinion-tracker welcome --workspace ./data` 可重新查看 landing。确认前不得抓取；更改目标、回溯、报告类型或画像后必须重新确认。
 

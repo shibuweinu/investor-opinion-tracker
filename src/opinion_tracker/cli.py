@@ -50,6 +50,7 @@ def _save_onboarding(
     style: str | None = None,
     aggressiveness: str | None = None,
     max_loss_per_trade_pct: float | None = None,
+    include_position_sizing: bool = False,
 ) -> None:
     custom_profile = any(value is not None for value in (style, aggressiveness, max_loss_per_trade_pct))
     if not accept_default_profile and not custom_profile:
@@ -68,6 +69,7 @@ def _save_onboarding(
             "qps": 1,
             "report_type": report_type,
             "trader_profile": profile.model_dump(),
+            "include_position_sizing": include_position_sizing,
         }
     )
     TaskStore(workspace).save_draft(draft)
@@ -95,6 +97,7 @@ def onboard(
     style: Annotated[str | None, typer.Option()] = None,
     aggressiveness: Annotated[str | None, typer.Option()] = None,
     max_loss_per_trade_pct: Annotated[float | None, typer.Option()] = None,
+    include_position_sizing: Annotated[bool, typer.Option("--include-position-sizing")] = False,
 ) -> None:
     """收集需求并保存未确认任务草稿。"""
     workspace = workspace or Path.cwd()
@@ -102,7 +105,7 @@ def onboard(
         _onboard_interactive(workspace)
         return
     _save_onboarding(workspace, user_urls, lookback_days, report_type, accept_default_profile,
-                     style, aggressiveness, max_loss_per_trade_pct)
+                     style, aggressiveness, max_loss_per_trade_pct, include_position_sizing)
 
 
 @app.command("task-status")
@@ -146,7 +149,7 @@ def run(
         raise typer.BadParameter(
             "请先运行 onboard，查看 task-summary，并在用户明确确认后执行 task-confirm"
         ) from exc
-    typer.echo(f"执行完成：抓取 {result.posts_collected} 条，报告位于 {output}")
+    typer.echo(f"证据准备完成：抓取 {result.posts_collected} 条；Agent 请读取 {output / 'ANALYZE.md'}")
 
 
 @app.command()

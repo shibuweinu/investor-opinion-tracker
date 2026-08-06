@@ -32,3 +32,14 @@ def test_confirmed_draft_is_invalidated_by_change(tmp_path):
 def test_absent_draft_cannot_be_confirmed(tmp_path):
     with pytest.raises(ValueError, match="任务草稿"):
         TaskStore(tmp_path).confirm()
+
+
+def test_position_option_defaults_off_and_invalidates_confirmation(tmp_path):
+    store = TaskStore(tmp_path)
+    original = draft()
+    assert original.include_position_sizing is False
+    store.save_draft(original)
+    store.confirm()
+    store.save_draft(draft(include_position_sizing=True))
+    with pytest.raises(PermissionError, match="重新确认"):
+        store.require_confirmed()

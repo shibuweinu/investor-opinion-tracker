@@ -34,6 +34,7 @@ class TaskDraft(BaseModel):
     report_type: Literal["daily", "weekly"] = "daily"
     trader_profile: TraderProfile = Field(default_factory=TraderProfile)
     authorization_confirmed: bool = True
+    include_position_sizing: bool = False
 
 
 class NormalizedPost(BaseModel):

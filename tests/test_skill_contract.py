@@ -30,3 +30,5 @@ def test_all_agent_guides_require_confirmed_onboarding():
     skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
     assert "不得复用历史" in skill
     assert "确认前不得抓取" in skill
+    for phrase in ["evidence-pack.json", "ANALYZE.md", "Agent 推导", "仓位建议默认关闭"]:
+        assert phrase in skill

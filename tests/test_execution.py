@@ -47,6 +47,10 @@ def test_confirmed_execution_collects_and_writes_report(tmp_path):
     save_draft(tmp_path, confirm=True)
     result = execute_confirmed(tmp_path, tmp_path / "reports", FakeCollector())
     assert result.posts_collected == 1
-    assert (tmp_path / "reports" / "report.md").exists()
     assert (tmp_path / "reports" / "posts.json").exists()
+    assert (tmp_path / "reports" / "evidence-pack.json").exists()
+    instructions = (tmp_path / "reports" / "ANALYZE.md").read_text(encoding="utf-8")
+    assert "按博主" in instructions and "失效条件" in instructions
+    assert "不得输出仓位" in instructions
+    assert not (tmp_path / "reports" / "report.md").exists()
     assert TaskStore(tmp_path).load().status == "completed"
