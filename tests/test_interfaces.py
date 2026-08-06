@@ -1,8 +1,8 @@
 from typer.testing import CliRunner
 
 from opinion_tracker.cli import app
-from opinion_tracker.config import Settings
 from opinion_tracker.collectors.xueqiu import XueqiuCollector
+from opinion_tracker.config import Settings
 from opinion_tracker.mcp_server import build_server
 from opinion_tracker.scheduling import schedule_hint
 from opinion_tracker.schemas import RunRequest
