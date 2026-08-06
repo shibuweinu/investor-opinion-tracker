@@ -43,7 +43,7 @@ def init(
 
 def _save_onboarding(
     workspace: Path,
-    user_url: str,
+    user_urls: list[str],
     lookback_days: int,
     report_type: str,
     accept_default_profile: bool,
@@ -63,7 +63,7 @@ def _save_onboarding(
     )
     draft = TaskDraft.model_validate(
         {
-            "user_urls": [user_url],
+            "user_urls": user_urls,
             "lookback_days": lookback_days,
             "qps": 1,
             "report_type": report_type,
@@ -82,13 +82,13 @@ def _onboard_interactive(workspace: Path) -> None:
     report_type = typer.prompt("报告类型 daily/weekly", default="daily")
     typer.echo("默认画像：mixed / balanced / 单笔计划亏损 0.5%")
     accepted = typer.confirm("接受默认画像？", default=True)
-    _save_onboarding(workspace, user_url, lookback_days, report_type, accepted)
+    _save_onboarding(workspace, [user_url], lookback_days, report_type, accepted)
 
 
 @app.command()
 def onboard(
     workspace: Annotated[Path | None, typer.Option()] = None,
-    user_url: Annotated[str | None, typer.Option("--user-url")] = None,
+    user_urls: Annotated[list[str] | None, typer.Option("--user-url")] = None,
     lookback_days: Annotated[int, typer.Option()] = 5,
     report_type: Annotated[str, typer.Option()] = "daily",
     accept_default_profile: Annotated[bool, typer.Option("--accept-default-profile")] = False,
@@ -98,10 +98,10 @@ def onboard(
 ) -> None:
     """收集需求并保存未确认任务草稿。"""
     workspace = workspace or Path.cwd()
-    if user_url is None:
+    if not user_urls:
         _onboard_interactive(workspace)
         return
-    _save_onboarding(workspace, user_url, lookback_days, report_type, accept_default_profile,
+    _save_onboarding(workspace, user_urls, lookback_days, report_type, accept_default_profile,
                      style, aggressiveness, max_loss_per_trade_pct)
 
 

@@ -34,6 +34,8 @@ python3.11 -m venv .venv
 .venv/bin/opinion-tracker run --workspace ./data --output ./reports
 ```
 
+跟踪多位博主时可重复传入 `--user-url`；每位博主分别抓取，报告统一汇总。
+
 随时运行 `opinion-tracker welcome --workspace ./data` 可重新查看 landing。确认前不得抓取；更改目标、回溯、报告类型或画像后必须重新确认。
 
 让 Agent 读取仓库根目录 `SKILL.md`。对于已有标准化 JSON，也可单独分析：

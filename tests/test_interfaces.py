@@ -115,6 +115,22 @@ def test_repeated_init_preserves_existing_profile(tmp_path):
     assert Settings.load(tmp_path).trader_profile.style == "short_term"
 
 
+def test_onboard_accepts_multiple_user_urls(tmp_path):
+    out = CliRunner().invoke(
+        app,
+        [
+            "onboard", "--workspace", str(tmp_path),
+            "--user-url", "https://xueqiu.com/u/111",
+            "--user-url", "https://xueqiu.com/u/222",
+            "--accept-default-profile",
+        ],
+    )
+    assert out.exit_code == 0
+    draft = TaskStore(tmp_path).load().draft
+    assert draft is not None
+    assert [str(url).rstrip("/").split("/")[-1] for url in draft.user_urls] == ["111", "222"]
+
+
 def test_schedule_hint_is_offer_only():
     hint = schedule_hint("daily")
     assert "cron" in hint and "不会自动创建" in hint

@@ -15,4 +15,6 @@ python3.11 -m venv .venv
 
 数据默认只写入调用者指定的工作目录，不写入 Skill 安装目录。
 
+`--user-url` 是可重复参数；例如 `--user-url https://xueqiu.com/u/111 --user-url https://xueqiu.com/u/222`。
+
 Agent 必须先用 `task-summary` 向用户展示草稿；得到明确确认后才调用 `task-confirm`。确认前不得运行 `run` 或抓取。`--no-interactive` 仅跳过终端问答，不跳过任务确认。
