@@ -7,6 +7,7 @@ from typing import Annotated, Literal
 import typer
 
 from .config import Settings
+from .execution import execute_confirmed
 from .onboarding import landing_text, task_summary, write_landing
 from .opinions import extract_opinions
 from .reporting import write_artifacts
@@ -105,6 +106,22 @@ def confirm_task(workspace: Annotated[Path | None, typer.Option()] = None) -> No
     except ValueError as exc:
         raise typer.BadParameter(str(exc)) from exc
     typer.echo(f"任务已确认：{record.fingerprint}")
+
+
+@app.command()
+def run(
+    workspace: Annotated[Path | None, typer.Option()] = None,
+    output: Annotated[Path, typer.Option()] = Path("reports"),
+) -> None:
+    """执行已经由用户确认的抓取与分析任务。"""
+    workspace = workspace or Path.cwd()
+    try:
+        result = execute_confirmed(workspace, output)
+    except PermissionError as exc:
+        raise typer.BadParameter(
+            "请先运行 onboard，查看 task-summary，并在用户明确确认后执行 task-confirm"
+        ) from exc
+    typer.echo(f"执行完成：抓取 {result.posts_collected} 条，报告位于 {output}")
 
 
 @app.command()
