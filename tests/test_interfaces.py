@@ -80,6 +80,31 @@ def test_task_confirm_requires_draft(tmp_path):
     assert out.exit_code != 0
 
 
+def test_task_summary_supports_json_and_custom_profile(tmp_path):
+    runner = CliRunner()
+    created = runner.invoke(
+        app,
+        [
+            "onboard", "--workspace", str(tmp_path),
+            "--user-url", "https://xueqiu.com/u/2292705444",
+            "--style", "short_term", "--aggressiveness", "aggressive",
+            "--max-loss-per-trade-pct", "0.8",
+        ],
+    )
+    assert created.exit_code == 0
+    summary = runner.invoke(app, ["task-summary", "--workspace", str(tmp_path), "--json"])
+    assert summary.exit_code == 0
+    payload = __import__("json").loads(summary.stdout)
+    assert payload["trader_profile"]["style"] == "short_term"
+    assert payload["trader_profile"]["max_loss_per_trade_pct"] == 0.8
+
+
+def test_interactive_init_can_exit_without_creating_target(tmp_path):
+    out = CliRunner().invoke(app, ["init", "--workspace", str(tmp_path)], input="n\n")
+    assert out.exit_code == 0
+    assert TaskStore(tmp_path).load().draft is None
+
+
 def test_schedule_hint_is_offer_only():
     hint = schedule_hint("daily")
     assert "cron" in hint and "不会自动创建" in hint

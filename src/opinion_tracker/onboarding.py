@@ -24,7 +24,7 @@ def landing_text(settings: Settings) -> str:
 
 ## 第一次任务
 
-1. Agent 询问博主主页、回溯天数、日报或周报及交易者画像。
+1. Agent 安装使用 `opinion-tracker init --no-interactive`，然后询问博主主页、回溯天数、日报或周报及交易者画像。
 2. Agent 运行 `onboard` 保存草稿并展示任务摘要；示例目标绝不会成为默认目标。
 3. 用户明确确认摘要后，Agent 才运行 `task-confirm` 和 `run`。
 

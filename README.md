@@ -21,12 +21,22 @@ cd investor-opinion-tracker
 python3.11 -m venv .venv
 .venv/bin/pip install '.[mcp]'
 .venv/bin/opinion-tracker doctor
-.venv/bin/opinion-tracker init --workspace ./data
+.venv/bin/opinion-tracker init --workspace ./data --no-interactive
 ```
 
-`init` 会在 `./data/.investor-opinion-tracker/WELCOME.md` 生成初始化 landing，说明第一次任务、默认交易者画像、外置 Chrome、内置 TDX 行情、日报/周报和定时任务。随时运行 `opinion-tracker welcome --workspace ./data` 可重新查看。
+`init --no-interactive` 会生成初始化 landing，但不会等待输入、创建默认博主或开始抓取。Agent 接下来询问用户需求，调用 `onboard` 保存草稿，以 `task-summary` 展示完整摘要；只有用户明确确认后才调用 `task-confirm` 和 `run`。示例 URL 永远不是默认目标。
 
-让 Agent 读取仓库根目录 `SKILL.md`。完成授权抓取并生成标准化 JSON 后：
+```bash
+.venv/bin/opinion-tracker onboard --workspace ./data --user-url https://xueqiu.com/u/USER_ID --lookback-days 5 --report-type daily --accept-default-profile
+.venv/bin/opinion-tracker task-summary --workspace ./data
+# 用户明确确认当前摘要后：
+.venv/bin/opinion-tracker task-confirm --workspace ./data
+.venv/bin/opinion-tracker run --workspace ./data --output ./reports
+```
+
+随时运行 `opinion-tracker welcome --workspace ./data` 可重新查看 landing。确认前不得抓取；更改目标、回溯、报告类型或画像后必须重新确认。
+
+让 Agent 读取仓库根目录 `SKILL.md`。对于已有标准化 JSON，也可单独分析：
 
 ```bash
 .venv/bin/opinion-tracker analyze-file --input examples/posts.json --output ./reports

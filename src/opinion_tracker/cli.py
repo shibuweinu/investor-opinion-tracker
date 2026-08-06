@@ -12,7 +12,7 @@ from .onboarding import landing_text, task_summary, write_landing
 from .opinions import extract_opinions
 from .reporting import write_artifacts
 from .scheduling import schedule_hint
-from .schemas import NormalizedPost, RunResult, TaskDraft
+from .schemas import NormalizedPost, RunResult, TaskDraft, TraderProfile
 from .scoring import score_candidate
 from .task_state import TaskStore
 
@@ -45,16 +45,32 @@ def _save_onboarding(
     lookback_days: int,
     report_type: str,
     accept_default_profile: bool,
+    style: str | None = None,
+    aggressiveness: str | None = None,
+    max_loss_per_trade_pct: float | None = None,
 ) -> None:
-    if not accept_default_profile:
+    custom_profile = any(value is not None for value in (style, aggressiveness, max_loss_per_trade_pct))
+    if not accept_default_profile and not custom_profile:
         raise typer.BadParameter("请先确认默认画像，或由 Agent 收集自定义画像")
     if report_type not in {"daily", "weekly"}:
         raise typer.BadParameter("报告类型必须是 daily 或 weekly")
-    draft = TaskDraft(
-        user_urls=[user_url], lookback_days=lookback_days, qps=1, report_type=report_type
+    profile = TraderProfile(
+        style=style or "mixed",  # type: ignore[arg-type]
+        aggressiveness=aggressiveness or "balanced",  # type: ignore[arg-type]
+        max_loss_per_trade_pct=max_loss_per_trade_pct or 0.5,
+    )
+    draft = TaskDraft.model_validate(
+        {
+            "user_urls": [user_url],
+            "lookback_days": lookback_days,
+            "qps": 1,
+            "report_type": report_type,
+            "trader_profile": profile.model_dump(),
+        }
     )
     TaskStore(workspace).save_draft(draft)
-    typer.echo("将使用 mixed / balanced / 单笔计划亏损 0.5%")
+    if not custom_profile:
+        typer.echo("将使用 mixed / balanced / 单笔计划亏损 0.5%")
     typer.echo(task_summary(draft))
 
 
@@ -74,13 +90,17 @@ def onboard(
     lookback_days: Annotated[int, typer.Option()] = 5,
     report_type: Annotated[str, typer.Option()] = "daily",
     accept_default_profile: Annotated[bool, typer.Option("--accept-default-profile")] = False,
+    style: Annotated[str | None, typer.Option()] = None,
+    aggressiveness: Annotated[str | None, typer.Option()] = None,
+    max_loss_per_trade_pct: Annotated[float | None, typer.Option()] = None,
 ) -> None:
     """收集需求并保存未确认任务草稿。"""
     workspace = workspace or Path.cwd()
     if user_url is None:
         _onboard_interactive(workspace)
         return
-    _save_onboarding(workspace, user_url, lookback_days, report_type, accept_default_profile)
+    _save_onboarding(workspace, user_url, lookback_days, report_type, accept_default_profile,
+                     style, aggressiveness, max_loss_per_trade_pct)
 
 
 @app.command("task-status")
@@ -90,12 +110,15 @@ def task_status(workspace: Annotated[Path | None, typer.Option()] = None) -> Non
 
 
 @app.command("task-summary")
-def show_task_summary(workspace: Annotated[Path | None, typer.Option()] = None) -> None:
+def show_task_summary(
+    workspace: Annotated[Path | None, typer.Option()] = None,
+    json_output: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
     workspace = workspace or Path.cwd()
     draft = TaskStore(workspace).load().draft
     if draft is None:
         raise typer.BadParameter("尚未创建任务草稿，请先运行 onboard")
-    typer.echo(task_summary(draft))
+    typer.echo(draft.model_dump_json(indent=2) if json_output else task_summary(draft))
 
 
 @app.command("task-confirm")
