@@ -1,12 +1,20 @@
 from __future__ import annotations
 
 import json
+import smtplib
 from pathlib import Path
 from typing import Annotated, Literal
 
 import typer
 
 from .config import Settings
+from .delivery import (
+    prompt_and_store_auth_code,
+    require_verified_result,
+    send_report,
+    send_test,
+    smtp_settings_for,
+)
 from .execution import execute_confirmed
 from .onboarding import landing_text, task_summary, write_landing
 from .opinions import extract_opinions
@@ -167,6 +175,40 @@ def show_schedule(kind: str = typer.Option("daily")) -> None:
 @app.command()
 def doctor() -> None:
     typer.echo("OK: Python 与核心依赖可用；浏览器适配器需由宿主 Agent 注入已授权会话。")
+
+
+@app.command("email-setup")
+def email_setup(address: Annotated[str, typer.Option("--address")]) -> None:
+    """将网易邮箱客户端授权码安全保存到 macOS 钥匙串。"""
+    smtp_settings_for(address)
+    prompt_and_store_auth_code(address)
+    typer.echo(f"已保存 {address} 的 SMTP 授权码；授权码未写入仓库或日志。")
+
+
+@app.command("email-test")
+def email_test(address: Annotated[str, typer.Option("--address")]) -> None:
+    """发送一封网易邮箱通道测试邮件。"""
+    try:
+        send_test(address)
+    except (OSError, RuntimeError, smtplib.SMTPException) as exc:
+        raise typer.BadParameter(f"测试邮件发送失败：{exc}") from exc
+    typer.echo(f"测试邮件已发送至 {address}")
+
+
+@app.command("email-send")
+def email_send(
+    address: Annotated[str, typer.Option("--address")],
+    report: Annotated[Path, typer.Option("--report", exists=True, readable=True)],
+    verification: Annotated[Path, typer.Option("--verification", exists=True, readable=True)],
+    kind: Annotated[Literal["daily", "weekly"], typer.Option("--kind")],
+) -> None:
+    """将验证完成的日报或周报发送到网易邮箱。"""
+    try:
+        require_verified_result(verification)
+        send_report(address, report, kind)
+    except (OSError, RuntimeError, ValueError, smtplib.SMTPException) as exc:
+        raise typer.BadParameter(f"报告邮件发送失败：{exc}") from exc
+    typer.echo(f"{kind} 报告已发送至 {address}")
 
 
 @app.command()

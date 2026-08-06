@@ -75,4 +75,20 @@ python3.11 -m venv .venv
 
 更多内容见 [CLI](references/cli.md)、[输入输出契约](references/contracts.md) 和 [WorkBuddy/MCP](references/workbuddy.md)。
 
+## 网易邮箱推送
+
+验证通过的日报或周报可以通过网易个人邮箱发送。客户端授权码只保存在 macOS 钥匙串，
+不会写入仓库、配置文件或日志：
+
+```bash
+.venv/bin/opinion-tracker email-setup --address user@163.com
+.venv/bin/opinion-tracker email-test --address user@163.com
+.venv/bin/opinion-tracker email-send --address user@163.com --report reports/report.md \
+  --verification reports/report.json --kind daily
+```
+
+支持 `163.com`、`126.com` 和 `yeah.net`，默认使用 SSL 465 端口。非 macOS 环境可通过
+`IOT_SMTP_AUTH_CODE` 环境变量临时提供授权码，但不得将该变量写入版本控制文件。
+`email-send` 会读取 `report.json` 并再次检查核验门禁；未达到 `ready_for_final` 的草稿禁止发送为正式报告。
+
 本项目只提供研究辅助，不构成投资建议。
