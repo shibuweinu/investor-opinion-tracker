@@ -34,6 +34,14 @@ def test_xueqiu_collection_and_cli(tmp_path):
     out = runner.invoke(app, ["init", "--workspace", str(tmp_path)])
     assert out.exit_code == 0
     assert (tmp_path / ".investor-opinion-tracker" / "config.json").exists()
+    landing = tmp_path / ".investor-opinion-tracker" / "WELCOME.md"
+    assert landing.exists()
+    text = landing.read_text(encoding="utf-8")
+    assert "第一次任务" in text
+    assert "外置 Chrome" in text
+    assert "TDX" in text
+    assert "单笔计划亏损 0.5%" in text
+    assert "schedule-hint" in text
 
 
 def test_schedule_hint_is_offer_only():

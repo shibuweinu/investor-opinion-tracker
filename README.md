@@ -6,7 +6,7 @@
 
 仓库不依赖 Codex 私有路径或特定浏览器。任何 Agent 都可采用两段式工作流：
 
-1. 使用自身已登录浏览器，按 [浏览器适配契约](references/browser-adapter.md) 抓取并标准化帖子；
+1. 默认使用用户已登录的外置 Chrome/CDP，按 [浏览器适配契约](references/browser-adapter.md) 抓取并标准化帖子；仅在外置浏览器不可用时回退到内置浏览器；
 2. 调用统一 CLI `analyze-file`，或通过 Python/MCP 使用相同核心模型生成报告。
 
 已提供 Codex Agent Skill、通用 CLI、MCP stdio 服务，以及 Claude/OpenClaw/腾讯 WorkBuddy 的配置说明。
@@ -24,6 +24,8 @@ python3.11 -m venv .venv
 .venv/bin/opinion-tracker init --workspace ./data
 ```
 
+`init` 会在 `./data/.investor-opinion-tracker/WELCOME.md` 生成初始化 landing，说明第一次任务、默认交易者画像、外置 Chrome、内置 TDX 行情、日报/周报和定时任务。随时运行 `opinion-tracker welcome --workspace ./data` 可重新查看。
+
 让 Agent 读取仓库根目录 `SKILL.md`。完成授权抓取并生成标准化 JSON 后：
 
 ```bash
@@ -39,6 +41,15 @@ python3.11 -m venv .venv
 - 数据不完整时只列观察项，不输出主动仓位；
 - 首份报告后仅提示可启动定时任务，未经确认不创建；
 - 日报建议交易日 18:30，周报建议周六 10:00。
+
+## 数据源优先级
+
+- 雪球：外置 Chrome/CDP + `agent-browser`，最后一条非置顶普通帖决定分页边界；
+- A股行情：使用仓库内置 `TdxClient` 调用 TDX API，不需要用户安装 `tdx-api` Skill；
+- ETF、基金和港股：使用 AKShare；
+- 单一数据源超时后立即降级，禁止无限等待。
+
+具体接口与单位换算见 [行情源顺序](references/market-data.md)。
 
 ## 开发与自检
 

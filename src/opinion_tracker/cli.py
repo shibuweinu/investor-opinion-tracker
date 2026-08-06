@@ -7,6 +7,7 @@ from typing import Annotated, Literal
 import typer
 
 from .config import Settings
+from .onboarding import landing_text, write_landing
 from .opinions import extract_opinions
 from .reporting import write_artifacts
 from .scheduling import schedule_hint
@@ -19,8 +20,12 @@ app = typer.Typer(help="可移植的投资者观点跟踪与交易研究工具")
 @app.command()
 def init(workspace: Annotated[Path | None, typer.Option(help="数据工作目录")] = None) -> None:
     workspace = workspace or Path.cwd()
-    path = Settings().save(workspace)
+    settings = Settings()
+    path = settings.save(workspace)
+    landing = write_landing(workspace, settings)
     typer.echo(f"已创建配置：{path}")
+    typer.echo(f"使用指南：{landing}")
+    typer.echo("下一步：启动已登录雪球的外置 Chrome，然后让 Agent 读取 SKILL.md 执行第一次任务。")
 
 
 @app.command()
@@ -37,6 +42,13 @@ def show_schedule(kind: str = typer.Option("daily")) -> None:
 @app.command()
 def doctor() -> None:
     typer.echo("OK: Python 与核心依赖可用；浏览器适配器需由宿主 Agent 注入已授权会话。")
+
+
+@app.command()
+def welcome(workspace: Annotated[Path | None, typer.Option()] = None) -> None:
+    """显示初始化使用指南。"""
+    workspace = workspace or Path.cwd()
+    typer.echo(landing_text(Settings.load(workspace)))
 
 
 @app.command("analyze-file")
