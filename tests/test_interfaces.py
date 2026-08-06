@@ -5,6 +5,7 @@ from opinion_tracker.collectors.xueqiu import XueqiuCollector
 from opinion_tracker.mcp_server import build_server
 from opinion_tracker.scheduling import schedule_hint
 from opinion_tracker.schemas import RunRequest
+from opinion_tracker.task_state import TaskStore
 
 
 class FakeBrowser:
@@ -31,7 +32,7 @@ def test_xueqiu_collection_and_cli(tmp_path):
     result = XueqiuCollector(FakeBrowser()).collect(req)
     assert result.status == "complete" and len(result.posts) == 1
     runner = CliRunner()
-    out = runner.invoke(app, ["init", "--workspace", str(tmp_path)])
+    out = runner.invoke(app, ["init", "--workspace", str(tmp_path), "--no-interactive"])
     assert out.exit_code == 0
     assert (tmp_path / ".investor-opinion-tracker" / "config.json").exists()
     landing = tmp_path / ".investor-opinion-tracker" / "WELCOME.md"
@@ -42,6 +43,41 @@ def test_xueqiu_collection_and_cli(tmp_path):
     assert "TDX" in text
     assert "单笔计划亏损 0.5%" in text
     assert "schedule-hint" in text
+    assert TaskStore(tmp_path).load().draft is None
+
+
+def test_noninteractive_init_waits_for_requirements(tmp_path):
+    out = CliRunner().invoke(app, ["init", "--workspace", str(tmp_path), "--no-interactive"])
+    assert out.exit_code == 0
+    assert "等待收集任务需求" in out.stdout
+    assert TaskStore(tmp_path).load().status == "onboarding_required"
+
+
+def test_onboard_saves_unconfirmed_draft_and_summary(tmp_path):
+    out = CliRunner().invoke(
+        app,
+        [
+            "onboard",
+            "--workspace",
+            str(tmp_path),
+            "--user-url",
+            "https://xueqiu.com/u/2292705444",
+            "--lookback-days",
+            "5",
+            "--report-type",
+            "daily",
+            "--accept-default-profile",
+        ],
+    )
+    assert out.exit_code == 0
+    assert "尚未执行" in out.stdout
+    assert "2292705444" in out.stdout
+    assert TaskStore(tmp_path).load().status == "draft"
+
+
+def test_task_confirm_requires_draft(tmp_path):
+    out = CliRunner().invoke(app, ["task-confirm", "--workspace", str(tmp_path)])
+    assert out.exit_code != 0
 
 
 def test_schedule_hint_is_offer_only():

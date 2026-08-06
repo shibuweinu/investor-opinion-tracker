@@ -2,6 +2,7 @@
 from pathlib import Path
 
 from .config import Settings
+from .schemas import TaskDraft
 
 
 def landing_text(settings: Settings) -> str:
@@ -23,9 +24,9 @@ def landing_text(settings: Settings) -> str:
 
 ## 第一次任务
 
-1. 启动已登录雪球的外置 Chrome 调试模式，并确认 `agent-browser --cdp 9222` 可连接。
-2. 告诉 Agent：博主主页、回溯天数、日报或周报；默认已存在授权声明。
-3. 让 Agent 读取仓库根目录 `SKILL.md` 并运行任务。
+1. Agent 询问博主主页、回溯天数、日报或周报及交易者画像。
+2. Agent 运行 `onboard` 保存草稿并展示任务摘要；示例目标绝不会成为默认目标。
+3. 用户明确确认摘要后，Agent 才运行 `task-confirm` 和 `run`。
 
 示例请求：
 
@@ -39,12 +40,15 @@ def landing_text(settings: Settings) -> str:
 ```bash
 opinion-tracker doctor
 opinion-tracker profile
+opinion-tracker task-status
+opinion-tracker task-summary
 opinion-tracker schedule-hint --kind daily
 opinion-tracker schedule-hint --kind weekly
 opinion-tracker welcome
 ```
 
 首次成功报告后可提示用户创建定时任务，但不会未经确认自行创建。凭据始终留在浏览器，不写入配置或报告。
+任务确认之前不会连接雪球或开始抓取。
 """
 
 
@@ -54,3 +58,17 @@ def write_landing(workspace: Path, settings: Settings) -> Path:
     path = directory / "WELCOME.md"
     path.write_text(landing_text(settings), encoding="utf-8")
     return path
+
+
+def task_summary(draft: TaskDraft) -> str:
+    profile = draft.trader_profile
+    targets = "、".join(str(item) for item in draft.user_urls)
+    return f"""任务摘要（尚未执行）
+- 博主：{targets}
+- 回溯：{draft.lookback_days} 天
+- QPS：{draft.qps}
+- 报告：{draft.report_type}
+- 画像：{profile.style} / {profile.aggressiveness} / 单笔计划亏损 {profile.max_loss_per_trade_pct}%
+- 授权声明：{'已声明' if draft.authorization_confirmed else '未声明'}
+确认内容无误后，再运行 opinion-tracker task-confirm。
+"""
