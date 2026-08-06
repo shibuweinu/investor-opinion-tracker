@@ -5,7 +5,7 @@ from opinion_tracker.collectors.xueqiu import XueqiuCollector
 from opinion_tracker.config import Settings
 from opinion_tracker.mcp_server import build_server
 from opinion_tracker.scheduling import schedule_hint
-from opinion_tracker.schemas import RunRequest
+from opinion_tracker.schemas import RunRequest, VerificationSummary
 from opinion_tracker.task_state import TaskStore
 
 
@@ -136,7 +136,7 @@ def test_schedule_hint_is_offer_only():
     assert "cron" in hint and "不会自动创建" in hint
 
 
-def test_cli_analyze_file(tmp_path):
+def test_cli_analyze_file_fails_closed_without_verification(tmp_path, monkeypatch):
     source = tmp_path / "posts.json"
     source.write_text(
         '[{"platform":"xueqiu","platform_post_id":"1","author_id":"u",'
@@ -144,11 +144,50 @@ def test_cli_analyze_file(tmp_path):
         '"url":"https://xueqiu.com/u/1"}]',
         encoding="utf-8",
     )
+    monkeypatch.setattr(
+        "opinion_tracker.cli.verify_research",
+        lambda opinions, fact_evidence: VerificationSummary(
+            market_status="verified", fact_status="unverified"
+        ),
+    )
     out = CliRunner().invoke(
         app, ["analyze-file", "--input", str(source), "--output", str(tmp_path / "reports")]
     )
+    assert out.exit_code == 2
+    assert (tmp_path / "reports" / "UNVERIFIED.md").exists()
+    assert not (tmp_path / "reports" / "report.md").exists()
+
+
+def test_cli_analyze_file_uses_workspace_profile_when_verified(tmp_path, monkeypatch):
+    source = tmp_path / "posts.json"
+    source.write_text(
+        '[{"platform":"xueqiu","platform_post_id":"1","author_id":"u",'
+        '"published_at":"2026-08-05T00:00:00Z","text":"看好 SH600276",'
+        '"url":"https://xueqiu.com/u/1"}]',
+        encoding="utf-8",
+    )
+    TaskStore(tmp_path).save_draft(
+        __import__("opinion_tracker.schemas", fromlist=["TaskDraft"]).TaskDraft(
+            user_urls=["https://xueqiu.com/u/1"],
+            trader_profile={"style": "mixed", "max_loss_per_trade_pct": 3},
+        )
+    )
+    monkeypatch.setattr(
+        "opinion_tracker.cli.verify_research",
+        lambda opinions, fact_evidence: VerificationSummary(
+            market_status="verified", fact_status="verified"
+        ),
+    )
+    out = CliRunner().invoke(
+        app,
+        [
+            "analyze-file", "--workspace", str(tmp_path), "--input", str(source),
+            "--output", str(tmp_path / "reports"),
+        ],
+    )
     assert out.exit_code == 0
-    assert (tmp_path / "reports" / "report.md").exists()
+    report = (tmp_path / "reports" / "report.md").read_text(encoding="utf-8")
+    assert "3.0%" in report
 
 
 def test_mcp_server_builds_with_installed_extra():

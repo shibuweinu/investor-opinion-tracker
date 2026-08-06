@@ -77,6 +77,38 @@ class TradeCandidate(BaseModel):
     data_complete: bool = True
 
 
+class MarketSnapshot(BaseModel):
+    symbol: str
+    price: float
+    previous_close: float
+    change_pct: float
+    volume_hands: int
+    source: str = "TDX"
+    verified_at: datetime
+
+
+class FactEvidence(BaseModel):
+    claim: str
+    opinion_ids: list[str] = Field(min_length=1)
+    source_url: HttpUrl
+    source_type: Literal["company", "exchange", "regulator", "government", "filing"]
+    verified_at: datetime
+
+
+class VerificationSummary(BaseModel):
+    market_status: Literal["verified", "not_required", "failed"] = "failed"
+    fact_status: Literal["verified", "unverified"] = "unverified"
+    market_snapshots: list[MarketSnapshot] = Field(default_factory=list)
+    fact_evidence: list[FactEvidence] = Field(default_factory=list)
+    errors: list[str] = Field(default_factory=list)
+    uncovered_opinion_ids: list[str] = Field(default_factory=list)
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def ready_for_final(self) -> bool:
+        return self.market_status in {"verified", "not_required"} and self.fact_status == "verified"
+
+
 class CollectionResult(BaseModel):
     status: Literal["complete", "incomplete", "failed"]
     posts: list[NormalizedPost] = Field(default_factory=list)
@@ -90,3 +122,4 @@ class RunResult(BaseModel):
     opinions: list[Opinion] = Field(default_factory=list)
     candidates: list[TradeCandidate] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
+    verification: VerificationSummary = Field(default_factory=VerificationSummary)

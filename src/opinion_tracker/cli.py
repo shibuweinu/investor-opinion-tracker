@@ -12,9 +12,10 @@ from .onboarding import landing_text, task_summary, write_landing
 from .opinions import extract_opinions
 from .reporting import write_artifacts
 from .scheduling import schedule_hint
-from .schemas import NormalizedPost, RunResult, TaskDraft, TraderProfile
+from .schemas import FactEvidence, NormalizedPost, RunResult, TaskDraft, TraderProfile
 from .scoring import score_candidate
 from .task_state import TaskStore
+from .verification import verify_research
 
 app = typer.Typer(help="可移植的投资者观点跟踪与交易研究工具")
 
@@ -179,18 +180,45 @@ def welcome(workspace: Annotated[Path | None, typer.Option()] = None) -> None:
 def analyze_file(
     input_path: Annotated[Path, typer.Option("--input", exists=True, readable=True)],
     output: Annotated[Path, typer.Option("--output")],
+    workspace: Annotated[Path | None, typer.Option("--workspace")] = None,
+    fact_evidence_path: Annotated[
+        Path | None, typer.Option("--fact-evidence", exists=True, readable=True)
+    ] = None,
     complete: Annotated[bool, typer.Option(help="抓取数据是否完整")] = True,
 ) -> None:
-    """分析宿主 Agent 抓取并标准化的帖子 JSON 数组。"""
+    """分析帖子并强制执行行情与独立事实核验门禁。"""
     posts = [
         NormalizedPost.model_validate(item) for item in json.loads(input_path.read_text(encoding="utf-8"))
     ]
     opinions = extract_opinions(posts)
-    candidates = [score_candidate(item, 0.5, 0.5, "C", complete) for item in opinions]
-    status: Literal["complete", "incomplete", "failed"] = "complete" if complete else "incomplete"
-    result = RunResult(status=status, posts_collected=len(posts), opinions=opinions, candidates=candidates)
-    paths = write_artifacts(output, result, Settings().trader_profile)
+    fact_evidence = (
+        [FactEvidence.model_validate(item) for item in json.loads(fact_evidence_path.read_text())]
+        if fact_evidence_path
+        else []
+    )
+    verification = verify_research(opinions, fact_evidence)
+    data_complete = complete and verification.ready_for_final
+    candidates = [score_candidate(item, 0.5, 0.5, "C", data_complete) for item in opinions]
+    status: Literal["complete", "incomplete", "failed"] = "complete" if data_complete else "incomplete"
+    warnings = [] if verification.ready_for_final else ["行情或独立事实核验未完成，仅生成未验证草稿"]
+    result = RunResult(
+        status=status,
+        posts_collected=len(posts),
+        opinions=opinions,
+        candidates=candidates,
+        warnings=warnings,
+        verification=verification,
+    )
+    profile = Settings.load(workspace).trader_profile if workspace else Settings().trader_profile
+    if workspace:
+        record = TaskStore(workspace).load()
+        if record.draft is not None:
+            profile = record.draft.trader_profile
+    paths = write_artifacts(output, result, profile)
     typer.echo(json.dumps({key: str(value) for key, value in paths.items()}, ensure_ascii=False))
+    if not verification.ready_for_final:
+        typer.echo("核验门禁未通过：已生成 UNVERIFIED.md，禁止作为最终报告交付。", err=True)
+        raise typer.Exit(code=2)
 
 
 def main() -> None:
