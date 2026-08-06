@@ -27,6 +27,15 @@ class RunRequest(BaseModel):
         return str(self.user_url).rstrip("/").split("/")[-1]
 
 
+class TaskDraft(BaseModel):
+    user_urls: list[HttpUrl] = Field(min_length=1)
+    lookback_days: int = Field(default=5, ge=1, le=365)
+    qps: float = Field(default=1.0, gt=0, le=1.0)
+    report_type: Literal["daily", "weekly"] = "daily"
+    trader_profile: TraderProfile = Field(default_factory=TraderProfile)
+    authorization_confirmed: bool = True
+
+
 class NormalizedPost(BaseModel):
     platform: str
     platform_post_id: str
