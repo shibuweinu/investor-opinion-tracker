@@ -12,7 +12,7 @@ from .onboarding import landing_text, task_summary, write_landing
 from .opinions import extract_opinions
 from .reporting import write_artifacts
 from .scheduling import schedule_hint
-from .schemas import FactEvidence, NormalizedPost, RunResult, TaskDraft, TraderProfile
+from .schemas import FactEvidence, NormalizedPost, ResearchClaim, RunResult, TaskDraft, TraderProfile
 from .scoring import score_candidate
 from .task_state import TaskStore
 from .verification import verify_research
@@ -181,6 +181,9 @@ def analyze_file(
     input_path: Annotated[Path, typer.Option("--input", exists=True, readable=True)],
     output: Annotated[Path, typer.Option("--output")],
     workspace: Annotated[Path | None, typer.Option("--workspace")] = None,
+    claims_path: Annotated[
+        Path | None, typer.Option("--claims", exists=True, readable=True)
+    ] = None,
     fact_evidence_path: Annotated[
         Path | None, typer.Option("--fact-evidence", exists=True, readable=True)
     ] = None,
@@ -191,12 +194,17 @@ def analyze_file(
         NormalizedPost.model_validate(item) for item in json.loads(input_path.read_text(encoding="utf-8"))
     ]
     opinions = extract_opinions(posts)
+    research_claims = (
+        [ResearchClaim.model_validate(item) for item in json.loads(claims_path.read_text())]
+        if claims_path
+        else []
+    )
     fact_evidence = (
         [FactEvidence.model_validate(item) for item in json.loads(fact_evidence_path.read_text())]
         if fact_evidence_path
         else []
     )
-    verification = verify_research(opinions, fact_evidence)
+    verification = verify_research(opinions, research_claims, fact_evidence, posts=posts)
     data_complete = complete and verification.ready_for_final
     candidates = [score_candidate(item, 0.5, 0.5, "C", data_complete) for item in opinions]
     status: Literal["complete", "incomplete", "failed"] = "complete" if data_complete else "incomplete"

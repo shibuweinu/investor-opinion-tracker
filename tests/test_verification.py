@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 
 from opinion_tracker.market import TdxQuote
-from opinion_tracker.schemas import FactEvidence, Opinion
+from opinion_tracker.schemas import FactEvidence, NormalizedPost, Opinion, ResearchClaim
 from opinion_tracker.verification import verify_research
 
 
@@ -36,24 +36,91 @@ class FakeQuotes:
         ]
 
 
-def test_verification_requires_independent_evidence_for_every_formal_opinion():
-    result = verify_research([opinion()], [], FakeQuotes())
+def test_verification_requires_semantic_classification_for_every_formal_opinion():
+    result = verify_research([opinion()], [], [], FakeQuotes())
     assert result.market_status == "verified"
-    assert result.fact_status == "unverified"
+    assert result.semantic_status == "unverified"
     assert result.uncovered_opinion_ids == ["op-1"]
     assert not result.ready_for_final
 
 
-def test_verification_is_ready_only_when_market_and_facts_are_covered():
-    evidence = FactEvidence(
-        claim="公司公告支持该观点",
+def test_subjective_claim_does_not_require_independent_fact_evidence():
+    claim = ResearchClaim(
+        claim_id="claim-1",
+        text="作者主观看好公司",
+        kind="subjective",
         opinion_ids=["op-1"],
+        symbols=["SH600276"],
+    )
+    result = verify_research([opinion()], [claim], [], FakeQuotes())
+    assert result.semantic_status == "verified"
+    assert result.fact_status == "verified"
+    assert result.ready_for_final
+
+
+def test_factual_claim_requires_independent_evidence():
+    claim = ResearchClaim(
+        claim_id="claim-1",
+        text="公司公告确认订单增长",
+        kind="factual",
+        opinion_ids=["op-1"],
+        symbols=["SH600276"],
+    )
+    uncovered = verify_research([opinion()], [claim], [], FakeQuotes())
+    assert uncovered.fact_status == "unverified"
+    assert uncovered.uncovered_claim_ids == ["claim-1"]
+    evidence = FactEvidence(
+        claim_ids=["claim-1"],
         source_url="https://www.sse.com.cn/disclosure/example",
         source_type="exchange",
         verified_at=datetime.now(UTC),
     )
-    result = verify_research([opinion()], [evidence], FakeQuotes())
+    result = verify_research([opinion()], [claim], [evidence], FakeQuotes())
     assert result.market_status == "verified"
+    assert result.semantic_status == "verified"
     assert result.fact_status == "verified"
     assert result.ready_for_final
     assert result.market_snapshots[0].change_pct == 2.04
+
+
+def test_market_verification_includes_nonformal_opinions_and_claim_symbols():
+    nonformal = opinion().model_copy(update={"formal": False, "symbol": "SH600276"})
+    claim = ResearchClaim(
+        claim_id="claim-1",
+        text="行业观点",
+        kind="subjective",
+        opinion_ids=["op-1"],
+        symbols=["SH600276"],
+    )
+    result = verify_research([nonformal], [claim], [], FakeQuotes())
+    assert result.market_status == "verified"
+    assert result.market_snapshots[0].symbol == "SH600276"
+
+
+class FakeMultiQuotes:
+    def quotes(self, codes):
+        assert codes == ["600276", "600519"]
+        return [
+            TdxQuote(
+                code=code, price=50, previous_close=49, open=49, high=50,
+                low=49, volume_hands=100, amount=5000,
+            )
+            for code in codes
+        ]
+
+
+def test_market_verification_scans_every_explicit_symbol_in_post_text():
+    post = NormalizedPost(
+        platform="xueqiu",
+        platform_post_id="post-1",
+        author_id="u",
+        published_at=datetime.now(UTC),
+        text="比较 SH600276 和 SH600519",
+        url="https://xueqiu.com/u/post-1",
+    )
+    claim = ResearchClaim(
+        claim_id="claim-1", text="比较两只股票", kind="subjective",
+        opinion_ids=["op-1"], symbols=[],
+    )
+    result = verify_research([opinion()], [claim], [], FakeMultiQuotes(), posts=[post])
+    assert [item.symbol for item in result.market_snapshots] == ["SH600276", "SH600519"]

@@ -146,7 +146,7 @@ def test_cli_analyze_file_fails_closed_without_verification(tmp_path, monkeypatc
     )
     monkeypatch.setattr(
         "opinion_tracker.cli.verify_research",
-        lambda opinions, fact_evidence: VerificationSummary(
+        lambda opinions, research_claims, fact_evidence, **kwargs: VerificationSummary(
             market_status="verified", fact_status="unverified"
         ),
     )
@@ -174,8 +174,8 @@ def test_cli_analyze_file_uses_workspace_profile_when_verified(tmp_path, monkeyp
     )
     monkeypatch.setattr(
         "opinion_tracker.cli.verify_research",
-        lambda opinions, fact_evidence: VerificationSummary(
-            market_status="verified", fact_status="verified"
+        lambda opinions, research_claims, fact_evidence, **kwargs: VerificationSummary(
+            market_status="verified", semantic_status="verified", fact_status="verified"
         ),
     )
     out = CliRunner().invoke(
