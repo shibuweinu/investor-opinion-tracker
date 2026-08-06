@@ -16,7 +16,7 @@
 需要 Python 3.11+：
 
 ```bash
-git clone git@github.com:dingxiaolong0715/investor-opinion-tracker.git
+git clone git@github.com:shibuweinu/investor-opinion-tracker.git
 cd investor-opinion-tracker
 python3.11 -m venv .venv
 .venv/bin/pip install '.[mcp]'
