@@ -46,6 +46,29 @@ class PortableConfig(StrictModel):
     revision: str
 
 
+class ReportJob(StrictModel):
+    job_id: Literal["morning", "evening", "weekly"]
+    kind: Literal["morning", "evening", "weekly"]
+    enabled: bool = True
+    lookback_days_by_role: dict[Literal["research", "auxiliary_news"], int]
+    weekdays: list[int]
+    hour: int = Field(ge=0, le=23)
+    minute: int = Field(default=0, ge=0, le=59)
+    timezone: str = "Asia/Shanghai"
+    incremental_from: Literal["previous_success", "previous_evening", "same_day_morning"]
+
+
+class PortableConfigV2(StrictModel):
+    schema_version: Literal[2] = 2
+    tracked_accounts: list[AccountConfig]
+    report_jobs: dict[Literal["morning", "evening", "weekly"], ReportJob]
+    trader_profile: TraderProfile
+    report_preferences: ReportPreferences = ReportPreferences()
+    sync: SyncPreferences = SyncPreferences()
+    updated_at: datetime
+    revision: str
+
+
 class SyncBinding(StrictModel):
     remote_url: str
     canonical_remote: str

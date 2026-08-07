@@ -69,7 +69,7 @@ def task_summary(draft: TaskDraft) -> str:
 - QPS：{draft.qps}
 - 报告：{draft.report_type}
 - 画像：{profile.style} / {profile.aggressiveness} / 单笔计划亏损 {profile.max_loss_per_trade_pct}%
-- 授权声明：{'已声明' if draft.authorization_confirmed else '未声明'}
-- 仓位建议：{'开启' if draft.include_position_sizing else '关闭'}
+- 授权声明：{"已声明" if draft.authorization_confirmed else "未声明"}
+- 仓位建议：{"开启" if draft.include_position_sizing else "关闭"}
 确认内容无误后，再运行 opinion-tracker task-confirm。
 """

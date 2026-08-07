@@ -14,9 +14,7 @@ class Collector(Protocol):
     def collect(self, request: RunRequest) -> CollectionResult: ...
 
 
-def execute_confirmed(
-    workspace: Path, output: Path, collector: Collector | None = None
-) -> RunResult:
+def execute_confirmed(workspace: Path, output: Path, collector: Collector | None = None) -> RunResult:
     store = TaskStore(workspace)
     record = store.require_confirmed()
     assert record.draft is not None

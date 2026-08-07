@@ -41,11 +41,7 @@ def verify_research(
             for symbol in claim.symbols
             if symbol.upper().startswith(("SH", "SZ"))
         }
-        | {
-            symbol.upper()
-            for post in posts or []
-            for symbol in MARKET_SYMBOL.findall(post.text)
-        }
+        | {symbol.upper() for post in posts or [] for symbol in MARKET_SYMBOL.findall(post.text)}
     )
     snapshots: list[MarketSnapshot] = []
     errors: list[str] = []

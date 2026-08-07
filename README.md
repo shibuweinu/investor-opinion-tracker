@@ -77,6 +77,12 @@ python3.11 -m venv .venv
 
 更多内容见 [CLI](references/cli.md)、[输入输出契约](references/contracts.md) 和 [WorkBuddy/MCP](references/workbuddy.md)。
 
+## 产品更新与个人配置更新
+
+两类更新彼此独立：`opinion-tracker update-check` 检查产品仓库的新功能，`opinion-tracker update --yes` 仅以 fast-forward 方式更新产品代码，不修改个人配置；`config-preflight` 拉取个人私有配置。Schema 较新时旧版本会停止覆盖并提示先更新产品。
+
+Schema v2 使用稳定任务 ID：`morning`（交易日 09:00）、`evening`（交易日 21:00）和 `weekly`（周日 18:00）。运行 `opinion-tracker jobs list --workspace ./data` 可在任何 Agent 中查看任务，不需要知道内部目录。
+
 ## 网易邮箱推送
 
 验证通过的日报或周报可以通过网易个人邮箱发送。客户端授权码只保存在 macOS 钥匙串，

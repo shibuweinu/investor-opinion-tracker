@@ -8,6 +8,7 @@ from typing import Annotated, Literal
 import typer
 
 from .config import Settings
+from .config_migration import migrate_portable_config
 from .config_sync import ConfigSyncService
 from .delivery import (
     prompt_and_store_auth_code,
@@ -19,18 +20,46 @@ from .delivery import (
 from .device_trust import DeviceTrustStore, KeychainTrustBackend, RepositoryIdentity
 from .execution import execute_confirmed
 from .git_repository import GitRepository
+from .job_state import JobStore
 from .onboarding import landing_text, task_summary, write_landing
 from .opinions import extract_opinions
+from .product_update import update_product, update_status
 from .reporting import write_artifacts
 from .scheduling import schedule_hint
 from .schemas import FactEvidence, NormalizedPost, ResearchClaim, RunResult, TaskDraft, TraderProfile
 from .scoring import score_candidate
-from .sync_models import PortableConfig
 from .sync_preflight import preflight_scheduled_run
 from .task_state import TaskStore
 from .verification import verify_research
 
 app = typer.Typer(help="可移植的投资者观点跟踪与交易研究工具")
+jobs_app = typer.Typer(help="按稳定任务 ID 管理早报、晚报和周报")
+app.add_typer(jobs_app, name="jobs")
+
+
+@jobs_app.command("list")
+def jobs_list(workspace: Annotated[Path, typer.Option("--workspace")]) -> None:
+    typer.echo(
+        json.dumps(
+            [job.model_dump(mode="json") for job in JobStore(workspace).list()], ensure_ascii=False, indent=2
+        )
+    )
+
+
+@app.command("update-check")
+def update_check(repository: Annotated[Path, typer.Option("--repository")] = Path(".")) -> None:
+    typer.echo(update_status(repository))
+
+
+@app.command("update")
+def update_command(
+    repository: Annotated[Path, typer.Option("--repository")] = Path("."),
+    yes: Annotated[bool, typer.Option("--yes")] = False,
+) -> None:
+    if not yes and not typer.confirm("仅快进更新产品代码？个人配置不会被修改。"):
+        raise typer.Abort()
+    update_product(repository)
+    typer.echo("产品已更新；请重新运行 pip install -e '.[mcp]'。")
 
 
 @app.command()
@@ -273,7 +302,7 @@ def config_push(
     yes: Annotated[bool, typer.Option("--yes")] = False,
 ) -> None:
     path = config_file or workspace / ".investor-opinion-tracker" / "portable-config.json"
-    document = PortableConfig.model_validate_json(path.read_text())
+    document = migrate_portable_config(json.loads(path.read_text()))
     if not yes and not typer.confirm("推送以上白名单个人配置？"):
         raise typer.Abort()
     commit = _sync_service(workspace).push(document)
@@ -292,7 +321,7 @@ def config_pull(
         raise typer.Abort()
     target = workspace / ".investor-opinion-tracker" / "portable-config.json"
     target.write_text(document.model_dump_json(indent=2), encoding="utf-8")
-    service.apply_document(document, report_kind="daily", role="research", trusted=False)
+    JobStore(workspace).materialize(document)
     typer.echo("配置已导入；执行前请确认任务摘要。")
 
 

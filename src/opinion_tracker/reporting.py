@@ -15,11 +15,14 @@ def render_markdown(result: RunResult, profile: TraderProfile, generated_at: dat
         rows.append(f"| {item.symbol or item.topic} | {item.score:.1f} | {state} | {item.evidence_level} |")
     table = "\n".join(rows) or "| 暂无 | - | avoid | D |"
     verification = result.verification
-    snapshot_rows = "\n".join(
-        f"| {item.symbol} | {item.price:.3f} | {item.change_pct:+.2f}% | "
-        f"{item.volume_hands} | {item.source} |"
-        for item in verification.market_snapshots
-    ) or "| 暂无 | - | - | - | - |"
+    snapshot_rows = (
+        "\n".join(
+            f"| {item.symbol} | {item.price:.3f} | {item.change_pct:+.2f}% | "
+            f"{item.volume_hands} | {item.source} |"
+            for item in verification.market_snapshots
+        )
+        or "| 暂无 | - | - | - | - |"
+    )
     errors = "；".join(verification.errors) or "无"
     return f"""# 投资者观点跟踪报告
 

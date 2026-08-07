@@ -5,9 +5,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
+from .config_migration import migrate_portable_config
 from .git_repository import GitRepository
+from .job_state import JobStore
 from .schemas import TaskDraft
-from .sync_models import PortableConfig, SyncAuditEntry, SyncBinding
+from .sync_models import PortableConfig, PortableConfigV2, SyncAuditEntry, SyncBinding
 from .task_state import TaskRecord, TaskStore
 
 
@@ -29,7 +31,7 @@ class ConfigSyncService:
         (self.state_dir / "sync-binding.json").write_text(binding.model_dump_json(indent=2))
         return binding
 
-    def push(self, document: PortableConfig) -> str:
+    def push(self, document: PortableConfig | PortableConfigV2) -> str:
         if self.repository is None:
             raise ValueError("未提供配置仓库")
         self.repository.write("config.json", document.model_dump_json(indent=2))
@@ -41,21 +43,23 @@ class ConfigSyncService:
         self._audit("push", commit, document)
         return commit
 
-    def load_remote(self) -> PortableConfig:
+    def load_remote(self) -> PortableConfigV2:
         if self.repository is None:
             raise ValueError("未提供配置仓库")
-        return PortableConfig.model_validate_json((self.repository.path / "config.json").read_text())
+        return migrate_portable_config(json.loads((self.repository.path / "config.json").read_text()))
 
     def update(self) -> bool:
         if self.repository is None:
             return False
         return self.repository.update_fast_forward()
 
-    def document(self) -> PortableConfig:
+    def document(self) -> PortableConfigV2:
         return self.load_remote()
 
     def apply_trusted(self) -> None:
-        self.apply_trusted_document(self.load_remote())
+        document = self.load_remote()
+        JobStore(self.workspace).materialize(document)
+        self._audit("auto_apply", None, document)
 
     def apply_trusted_document(self, document: PortableConfig) -> None:
         document = PortableConfig.model_validate(document.model_dump())
@@ -115,7 +119,7 @@ class ConfigSyncService:
         self._audit("auto_apply" if trusted else "pull", None, document)
         return record
 
-    def _audit(self, action: str, commit: str | None, document: PortableConfig) -> None:
+    def _audit(self, action: str, commit: str | None, document: PortableConfig | PortableConfigV2) -> None:
         self.state_dir.mkdir(parents=True, exist_ok=True)
         entry = SyncAuditEntry(
             occurred_at=datetime.now(UTC),
