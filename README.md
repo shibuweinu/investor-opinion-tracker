@@ -18,11 +18,11 @@
 ```bash
 git clone git@github.com:shibuweinu/investor-opinion-tracker.git
 cd investor-opinion-tracker
-python3.11 -m venv .venv
-.venv/bin/pip install '.[mcp]'
-.venv/bin/opinion-tracker doctor
+./scripts/bootstrap.sh
 .venv/bin/opinion-tracker init --workspace ./data --no-interactive
 ```
+
+`bootstrap.sh` 会先升级虚拟环境内的 pip/setuptools，兼容 macOS 自带的旧 pip；不会修改系统 Python。也可以设置 `PYTHON_BIN` 指定 Python 3.11+。
 
 `init --no-interactive` 会生成初始化 landing，但不会等待输入、创建默认博主或开始抓取。Agent 接下来询问用户需求，调用 `onboard` 保存草稿，以 `task-summary` 展示完整摘要；只有用户明确确认后才调用 `task-confirm` 和 `run`。示例 URL 永远不是默认目标。
 
