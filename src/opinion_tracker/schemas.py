@@ -86,6 +86,7 @@ class MarketSnapshot(BaseModel):
     change_pct: float
     volume_hands: int
     source: str = "TDX"
+    market_time: datetime | None = None
     verified_at: datetime
 
 

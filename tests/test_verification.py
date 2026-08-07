@@ -1,6 +1,7 @@
 from datetime import UTC, datetime
+from zoneinfo import ZoneInfo
 
-from opinion_tracker.market import TdxQuote
+from opinion_tracker.market import TdxDailyBar, TdxQuote
 from opinion_tracker.schemas import FactEvidence, NormalizedPost, Opinion, ResearchClaim
 from opinion_tracker.verification import verify_research
 
@@ -133,3 +134,50 @@ def test_market_verification_scans_every_explicit_symbol_in_post_text():
     )
     result = verify_research([opinion()], [claim], [], FakeMultiQuotes(), posts=[post])
     assert [item.symbol for item in result.market_snapshots] == ["SH600276", "SH600519"]
+
+
+class FakeHistoricalQuotes:
+    def quotes(self, codes):
+        raise AssertionError("有报告截止时间时不得读取实时行情")
+
+    def daily_closes(self, codes, as_of):
+        assert codes == ["600276"]
+        assert as_of == datetime(2026, 8, 7, 9, tzinfo=ZoneInfo("Asia/Shanghai"))
+        return [
+            TdxDailyBar(
+                code="600276",
+                time=datetime(2026, 8, 6, 15, tzinfo=ZoneInfo("Asia/Shanghai")),
+                close=52.11,
+                previous_close=53.54,
+                open=53.65,
+                high=53.81,
+                low=52.0,
+                volume_hands=898631,
+                amount=0,
+            )
+        ]
+
+
+def test_market_as_of_uses_last_completed_daily_close():
+    claim = ResearchClaim(
+        claim_id="claim-1",
+        text="作者主观看好公司",
+        kind="subjective",
+        opinion_ids=["op-1"],
+        symbols=["SH600276"],
+    )
+    cutoff = datetime(2026, 8, 7, 9, tzinfo=ZoneInfo("Asia/Shanghai"))
+
+    result = verify_research(
+        [opinion()], [claim], [], FakeHistoricalQuotes(), market_as_of=cutoff
+    )
+
+    snapshot = result.market_snapshots[0]
+    assert result.market_status == "verified"
+    assert snapshot.price == 52.11
+    assert snapshot.change_pct == -2.67
+    assert snapshot.volume_hands == 898631
+    assert snapshot.market_time == datetime(
+        2026, 8, 6, 15, tzinfo=ZoneInfo("Asia/Shanghai")
+    )
+    assert snapshot.source == "TDX daily"

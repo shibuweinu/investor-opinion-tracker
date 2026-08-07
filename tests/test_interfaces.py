@@ -169,6 +169,35 @@ def test_cli_analyze_file_fails_closed_without_verification(tmp_path, monkeypatc
     assert not (tmp_path / "reports" / "report.md").exists()
 
 
+def test_scheduled_analyze_requires_market_cutoff(tmp_path):
+    source = tmp_path / "posts.json"
+    source.write_text(
+        '[{"platform":"xueqiu","platform_post_id":"1","author_id":"u",'
+        '"published_at":"2026-08-05T00:00:00Z","text":"看好 SH600276",'
+        '"url":"https://xueqiu.com/u/1"}]',
+        encoding="utf-8",
+    )
+    job_workspace = tmp_path / "morning"
+    job_workspace.mkdir()
+    (job_workspace / "job.json").write_text("{}", encoding="utf-8")
+
+    out = CliRunner().invoke(
+        app,
+        [
+            "analyze-file",
+            "--workspace",
+            str(job_workspace),
+            "--input",
+            str(source),
+            "--output",
+            str(tmp_path / "reports"),
+        ],
+    )
+
+    assert out.exit_code != 0
+    assert "必须传入 --market-as-of" in out.output
+
+
 def test_cli_analyze_file_uses_workspace_profile_when_verified(tmp_path, monkeypatch):
     source = tmp_path / "posts.json"
     source.write_text(

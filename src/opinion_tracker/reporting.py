@@ -18,10 +18,11 @@ def render_markdown(result: RunResult, profile: TraderProfile, generated_at: dat
     snapshot_rows = (
         "\n".join(
             f"| {item.symbol} | {item.price:.3f} | {item.change_pct:+.2f}% | "
-            f"{item.volume_hands} | {item.source} |"
+            f"{item.volume_hands} | "
+            f"{item.market_time.isoformat() if item.market_time else '-'} | {item.source} |"
             for item in verification.market_snapshots
         )
-        or "| 暂无 | - | - | - | - |"
+        or "| 暂无 | - | - | - | - | - |"
     )
     errors = "；".join(verification.errors) or "无"
     return f"""# 投资者观点跟踪报告
@@ -46,8 +47,8 @@ def render_markdown(result: RunResult, profile: TraderProfile, generated_at: dat
 
 ## 行情交叉验证
 
-| 标的 | 最新价 | 当日涨跌 | 成交量（手） | 来源 |
-|---|---:|---:|---:|---|
+| 标的 | 价格 | 涨跌幅 | 成交量（手） | 行情时间 | 来源 |
+|---|---:|---:|---:|---|---|
 {snapshot_rows}
 
 - 核验错误：{errors}

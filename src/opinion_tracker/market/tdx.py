@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, cast
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
@@ -21,6 +22,19 @@ def _transport(url: str, headers: dict[str, str], timeout: float) -> Payload:
 class TdxQuote:
     code: str
     price: float
+    previous_close: float
+    open: float
+    high: float
+    low: float
+    volume_hands: int
+    amount: int
+
+
+@dataclass(frozen=True)
+class TdxDailyBar:
+    code: str
+    time: datetime
+    close: float
     previous_close: float
     open: float
     high: float
@@ -68,4 +82,32 @@ class TdxClient:
                     amount=int(row.get("Amount", 0)),
                 )
             )
+        return result
+
+    def daily_bars(self, code: str) -> list[TdxDailyBar]:
+        payload = self._get("/api/kline", {"code": code, "type": "day"})
+        rows = payload.get("List", []) if isinstance(payload, dict) else payload
+        return [
+            TdxDailyBar(
+                code=code,
+                time=datetime.fromisoformat(row["Time"]),
+                close=row["Close"] / 1000,
+                previous_close=row["Last"] / 1000,
+                open=row["Open"] / 1000,
+                high=row["High"] / 1000,
+                low=row["Low"] / 1000,
+                volume_hands=int(row.get("Volume", 0)),
+                amount=int(row.get("Amount", 0)),
+            )
+            for row in rows
+        ]
+
+    def daily_closes(self, codes: list[str], as_of: datetime) -> list[TdxDailyBar]:
+        if as_of.tzinfo is None:
+            raise ValueError("行情截止时间必须包含时区")
+        result = []
+        for code in codes:
+            eligible = [bar for bar in self.daily_bars(code) if bar.time <= as_of]
+            if eligible:
+                result.append(max(eligible, key=lambda bar: bar.time))
         return result

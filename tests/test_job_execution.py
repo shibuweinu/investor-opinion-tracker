@@ -49,6 +49,8 @@ def test_jobs_materialize_confirm_and_filter_incremental_window(tmp_path):
     assert result.posts_collected == 1
     assert store.window("morning", cutoff).since == cutoff - timedelta(hours=12)
     assert {request.since for request in collector.requests} == {cutoff - timedelta(hours=12)}
+    analyze = (tmp_path / "out" / "ANALYZE.md").read_text(encoding="utf-8")
+    assert "--market-as-of 2026-08-07T09:00:00+00:00" in analyze
 
 
 def test_checkpoint_advances_only_after_verified_completion(tmp_path):

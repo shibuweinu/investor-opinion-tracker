@@ -119,3 +119,44 @@ def test_tdx_client_converts_li_to_yuan():
     quote = client.quotes(["688235"])[0]
     assert quote.previous_close == 261.96
     assert quote.price == 280.6
+
+
+def test_tdx_client_selects_daily_close_before_cutoff():
+    payload = {
+        "code": 0,
+        "message": "success",
+        "data": {
+            "Count": 2,
+            "List": [
+                {
+                    "Last": 53540,
+                    "Open": 53650,
+                    "High": 53810,
+                    "Low": 52000,
+                    "Close": 52110,
+                    "Volume": 898631,
+                    "Amount": 0,
+                    "Time": "2026-08-06T15:00:00+08:00",
+                },
+                {
+                    "Last": 52110,
+                    "Open": 52200,
+                    "High": 53000,
+                    "Low": 51800,
+                    "Close": 52800,
+                    "Volume": 700000,
+                    "Amount": 0,
+                    "Time": "2026-08-07T15:00:00+08:00",
+                },
+            ],
+        },
+    }
+    client = TdxClient(transport=lambda url, headers, timeout: payload)
+    cutoff = datetime.fromisoformat("2026-08-07T09:00:00+08:00")
+
+    bar = client.daily_closes(["600276"], cutoff)[0]
+
+    assert bar.time == datetime.fromisoformat("2026-08-06T15:00:00+08:00")
+    assert bar.close == 52.11
+    assert bar.previous_close == 53.54
+    assert bar.volume_hands == 898631

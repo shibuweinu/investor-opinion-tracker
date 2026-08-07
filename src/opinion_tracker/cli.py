@@ -445,8 +445,14 @@ def analyze_file(
         Path | None, typer.Option("--fact-evidence", exists=True, readable=True)
     ] = None,
     complete: Annotated[bool, typer.Option(help="抓取数据是否完整")] = True,
+    market_as_of: Annotated[
+        str | None,
+        typer.Option(help="行情截止时间；定时报告使用该时间之前最近完整日线"),
+    ] = None,
 ) -> None:
     """分析帖子并强制执行行情与独立事实核验门禁。"""
+    if workspace and (workspace / "job.json").exists() and market_as_of is None:
+        raise typer.BadParameter("定时报告必须传入 --market-as-of，禁止回退到实时行情")
     posts = [
         NormalizedPost.model_validate(item) for item in json.loads(input_path.read_text(encoding="utf-8"))
     ]
@@ -461,7 +467,13 @@ def analyze_file(
         if fact_evidence_path
         else []
     )
-    verification = verify_research(opinions, research_claims, fact_evidence, posts=posts)
+    verification = verify_research(
+        opinions,
+        research_claims,
+        fact_evidence,
+        posts=posts,
+        market_as_of=_parse_now(market_as_of) if market_as_of else None,
+    )
     data_complete = complete and verification.ready_for_final
     candidates = [score_candidate(item, 0.5, 0.5, "C", data_complete) for item in opinions]
     status: Literal["complete", "incomplete", "failed"] = "complete" if data_complete else "incomplete"

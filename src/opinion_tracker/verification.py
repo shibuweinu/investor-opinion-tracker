@@ -4,7 +4,7 @@ import re
 from datetime import datetime
 from typing import Protocol
 
-from .market import TdxClient, TdxQuote
+from .market import TdxClient, TdxDailyBar, TdxQuote
 from .schemas import (
     FactEvidence,
     MarketSnapshot,
@@ -17,16 +17,19 @@ from .schemas import (
 MARKET_SYMBOL = re.compile(r"(?:SH|SZ)\d{6}", re.I)
 
 
-class QuoteClient(Protocol):
+class MarketClient(Protocol):
     def quotes(self, codes: list[str]) -> list[TdxQuote]: ...
+
+    def daily_closes(self, codes: list[str], as_of: datetime) -> list[TdxDailyBar]: ...
 
 
 def verify_research(
     opinions: list[Opinion],
     research_claims: list[ResearchClaim],
     fact_evidence: list[FactEvidence],
-    client: QuoteClient | None = None,
+    client: MarketClient | None = None,
     posts: list[NormalizedPost] | None = None,
+    market_as_of: datetime | None = None,
 ) -> VerificationSummary:
     symbols = sorted(
         {
@@ -49,25 +52,36 @@ def verify_research(
     if symbols:
         market_status = "failed"
         try:
-            quotes = (client or TdxClient()).quotes([symbol[2:] for symbol in symbols])
-            by_code = {quote.code: quote for quote in quotes}
+            active_client = client or TdxClient()
+            by_code: dict[str, TdxDailyBar | TdxQuote]
+            if market_as_of is not None:
+                bars = active_client.daily_closes(
+                    [symbol[2:] for symbol in symbols], market_as_of
+                )
+                by_code = {bar.code: bar for bar in bars}
+            else:
+                quotes = active_client.quotes([symbol[2:] for symbol in symbols])
+                by_code = {quote.code: quote for quote in quotes}
             missing = [symbol for symbol in symbols if symbol[2:] not in by_code]
             if missing:
                 errors.append(f"TDX 未返回行情：{', '.join(missing)}")
             else:
                 verified_at = datetime.now().astimezone()
                 for symbol in symbols:
-                    quote = by_code[symbol[2:]]
+                    item = by_code[symbol[2:]]
+                    price = item.close if isinstance(item, TdxDailyBar) else item.price
                     change_pct = (
-                        (quote.price / quote.previous_close - 1) * 100 if quote.previous_close else 0.0
+                        (price / item.previous_close - 1) * 100 if item.previous_close else 0.0
                     )
                     snapshots.append(
                         MarketSnapshot(
                             symbol=symbol,
-                            price=quote.price,
-                            previous_close=quote.previous_close,
+                            price=price,
+                            previous_close=item.previous_close,
                             change_pct=round(change_pct, 2),
-                            volume_hands=quote.volume_hands,
+                            volume_hands=item.volume_hands,
+                            source="TDX daily" if isinstance(item, TdxDailyBar) else "TDX quote",
+                            market_time=item.time if isinstance(item, TdxDailyBar) else verified_at,
                             verified_at=verified_at,
                         )
                     )

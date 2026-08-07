@@ -103,7 +103,11 @@ class JobStore:
             else "周报：总结七天观点变化、一致与分歧。"
         )
         analyze.write_text(
-            f"# 报告类型\n\n{context}\n\n" + analyze.read_text(encoding="utf-8"), encoding="utf-8"
+            f"# 报告类型\n\n{context}\n\n"
+            f"行情核验调用 `analyze-file` 时必须传入 "
+            f"`--market-as-of {until.isoformat()}`，只使用该截止时间之前最近一根完整日线。\n\n"
+            + analyze.read_text(encoding="utf-8"),
+            encoding="utf-8",
         )
         return result
 

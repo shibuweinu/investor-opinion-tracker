@@ -1,3 +1,3 @@
-from .tdx import TdxClient, TdxQuote
+from .tdx import TdxClient, TdxDailyBar, TdxQuote
 
-__all__ = ["TdxClient", "TdxQuote"]
+__all__ = ["TdxClient", "TdxDailyBar", "TdxQuote"]
