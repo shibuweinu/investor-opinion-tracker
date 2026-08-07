@@ -16,6 +16,8 @@ class TaskRecord(BaseModel):
     draft: TaskDraft | None = None
     fingerprint: str | None = None
     confirmed_at: datetime | None = None
+    confirmation_source: Literal["user", "auto_applied"] | None = None
+    source_revision: str | None = None
 
 
 def task_fingerprint(draft: TaskDraft) -> str:
@@ -54,6 +56,19 @@ class TaskStore:
                 draft=current.draft,
                 fingerprint=task_fingerprint(current.draft),
                 confirmed_at=datetime.now(UTC),
+                confirmation_source="user",
+            )
+        )
+
+    def confirm_auto_applied(self, draft: TaskDraft, revision: str) -> TaskRecord:
+        return self._write(
+            TaskRecord(
+                status="confirmed",
+                draft=draft,
+                fingerprint=task_fingerprint(draft),
+                confirmed_at=datetime.now(UTC),
+                confirmation_source="auto_applied",
+                source_revision=revision,
             )
         )
 
