@@ -46,6 +46,17 @@ class ConfigSyncService:
             raise ValueError("未提供配置仓库")
         return PortableConfig.model_validate_json((self.repository.path / "config.json").read_text())
 
+    def update(self) -> bool:
+        if self.repository is None:
+            return False
+        return self.repository.update_fast_forward()
+
+    def document(self) -> PortableConfig:
+        return self.load_remote()
+
+    def apply_trusted(self) -> None:
+        self.apply_document(self.load_remote(), report_kind="daily", role="research", trusted=True)
+
     def apply_document(
         self, document: PortableConfig, *, report_kind: Literal["daily", "weekly"],
         role: Literal["research", "auxiliary_news"], trusted: bool,

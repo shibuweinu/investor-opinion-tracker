@@ -35,3 +35,13 @@ def test_rejects_push_when_remote_advanced(tmp_path):
     second.write("README.md", "local"); second.commit(["README.md"], "local")
     with pytest.raises(GitConflictError):
         second.push_fast_forward()
+
+
+def test_update_fast_forward_adopts_remote_commit(tmp_path):
+    remote = tmp_path / "remote.git"; git("init", "--bare", str(remote))
+    first = GitRepository(str(remote), tmp_path / "one"); first.clone_or_open()
+    first.write("config.json", "{}"); first.commit(["config.json"], "one"); first.push_fast_forward()
+    second = GitRepository(str(remote), tmp_path / "two"); second.clone_or_open()
+    first.write("config.json", '{"v":2}'); first.commit(["config.json"], "two"); first.push_fast_forward()
+    assert second.update_fast_forward() is True
+    assert second.head() == first.head()

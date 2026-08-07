@@ -76,5 +76,16 @@ class GitRepository:
         except GitError as exc:
             raise GitConflictError("远端拒绝快进推送") from exc
 
+    def update_fast_forward(self) -> bool:
+        before = self.head()
+        self.fetch()
+        remote = self._run("rev-parse", "origin/main")
+        if before == remote:
+            return False
+        if not self.is_ancestor(before, remote):
+            raise GitConflictError("本地和远端配置历史已分叉")
+        self._run("merge", "--ff-only", "origin/main")
+        return True
+
     def canonical_remote(self) -> str:
         return canonicalize_remote(self.remote_url)
