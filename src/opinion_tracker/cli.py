@@ -474,10 +474,21 @@ def analyze_file(
         posts=posts,
         market_as_of=_parse_now(market_as_of) if market_as_of else None,
     )
-    data_complete = complete and verification.ready_for_final
-    candidates = [score_candidate(item, 0.5, 0.5, "C", data_complete) for item in opinions]
-    status: Literal["complete", "incomplete", "failed"] = "complete" if data_complete else "incomplete"
-    warnings = [] if verification.ready_for_final else ["行情或独立事实核验未完成，仅生成未验证草稿"]
+    delivery_ready = complete and verification.ready_for_delivery
+    included_ids = set(verification.included_opinion_ids)
+    candidates = [
+        score_candidate(item, 0.5, 0.5, "C", delivery_ready)
+        for item in opinions
+        if item.opinion_id in included_ids
+    ]
+    status: Literal["complete", "incomplete", "failed"] = "complete" if delivery_ready else "incomplete"
+    warnings = []
+    if verification.excluded_opinion_ids:
+        warnings.append(
+            f"已排除 {len(verification.excluded_opinion_ids)} 条未通过核验的内容；不参与共识、评分和候选"
+        )
+    if not verification.ready_for_delivery:
+        warnings.append("行情核验未完成，仅生成未验证草稿")
     result = RunResult(
         status=status,
         posts_collected=len(posts),
@@ -493,9 +504,11 @@ def analyze_file(
             profile = record.draft.trader_profile
     paths = write_artifacts(output, result, profile)
     typer.echo(json.dumps({key: str(value) for key, value in paths.items()}, ensure_ascii=False))
-    if not verification.ready_for_final:
+    if not verification.ready_for_delivery:
         typer.echo("核验门禁未通过：已生成 UNVERIFIED.md，禁止作为最终报告交付。", err=True)
         raise typer.Exit(code=2)
+    if not verification.ready_for_final:
+        typer.echo("部分核验通过：失败内容已隔离，生成可交付的信息型报告。", err=True)
 
 
 def main() -> None:

@@ -147,7 +147,7 @@ def test_schedule_hint_is_offer_only():
     assert "cron" in hint and "不会自动创建" in hint
 
 
-def test_cli_analyze_file_fails_closed_without_verification(tmp_path, monkeypatch):
+def test_cli_analyze_file_fails_closed_when_market_verification_fails(tmp_path, monkeypatch):
     source = tmp_path / "posts.json"
     source.write_text(
         '[{"platform":"xueqiu","platform_post_id":"1","author_id":"u",'
@@ -158,7 +158,7 @@ def test_cli_analyze_file_fails_closed_without_verification(tmp_path, monkeypatc
     monkeypatch.setattr(
         "opinion_tracker.cli.verify_research",
         lambda opinions, research_claims, fact_evidence, **kwargs: VerificationSummary(
-            market_status="verified", fact_status="unverified"
+            market_status="failed", fact_status="unverified"
         ),
     )
     out = CliRunner().invoke(
@@ -167,6 +167,39 @@ def test_cli_analyze_file_fails_closed_without_verification(tmp_path, monkeypatc
     assert out.exit_code == 2
     assert (tmp_path / "reports" / "UNVERIFIED.md").exists()
     assert not (tmp_path / "reports" / "report.md").exists()
+
+
+def test_cli_analyze_file_delivers_partial_report_and_excludes_failed_content(tmp_path, monkeypatch):
+    source = tmp_path / "posts.json"
+    source.write_text(
+        '[{"platform":"xueqiu","platform_post_id":"1","author_id":"u",'
+        '"published_at":"2026-08-05T00:00:00Z","text":"看好 SH600276",'
+        '"url":"https://xueqiu.com/u/1"}]',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "opinion_tracker.cli.verify_research",
+        lambda opinions, research_claims, fact_evidence, **kwargs: VerificationSummary(
+            market_status="not_required",
+            semantic_status="unverified",
+            fact_status="verified",
+            excluded_opinion_ids=[opinions[0].opinion_id],
+            exclusion_reasons={opinions[0].opinion_id: "缺少语义归因，已排除"},
+        ),
+    )
+
+    out = CliRunner().invoke(
+        app, ["analyze-file", "--input", str(source), "--output", str(tmp_path / "reports")]
+    )
+
+    assert out.exit_code == 0
+    assert (tmp_path / "reports" / "report.md").exists()
+    assert not (tmp_path / "reports" / "UNVERIFIED.md").exists()
+    payload = __import__("json").loads(
+        (tmp_path / "reports" / "report.json").read_text(encoding="utf-8")
+    )
+    assert payload["candidates"] == []
+    assert payload["verification"]["ready_for_delivery"] is True
 
 
 def test_scheduled_analyze_requires_market_cutoff(tmp_path):

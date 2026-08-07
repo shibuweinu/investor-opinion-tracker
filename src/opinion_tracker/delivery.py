@@ -132,7 +132,8 @@ def require_verified_result(verification_path: Path) -> None:
         verification = payload["verification"]
     except (OSError, json.JSONDecodeError, KeyError, TypeError) as exc:
         raise ValueError("无法读取有效的报告核验结果") from exc
-    if payload.get("status") != "complete" or verification.get("ready_for_final") is not True:
+    deliverable = verification.get("ready_for_delivery", verification.get("ready_for_final"))
+    if payload.get("status") != "complete" or deliverable is not True:
         raise ValueError("核验门禁未通过，禁止发送正式日报或周报")
 
 

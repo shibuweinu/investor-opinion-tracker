@@ -47,6 +47,10 @@ cd investor-opinion-tracker
 .venv/bin/opinion-tracker analyze-file --input examples/posts.json --output ./reports
 ```
 
+核验采用逐项隔离：缺少语义归因或独立事实证据的内容会从共识、候选评分和标的结论中排除，
+并记录在报告的“排除内容”章节。其余内容完成行情核验后仍可生成部分验证报告；行情失败或
+采集不完整仍会生成 `UNVERIFIED.md`，禁止发送正式邮件。
+
 输出 `report.md` 与 `report.json`。真实帖子、配置、数据库、Cookie 和报告均被 `.gitignore` 排除；切勿提交凭据。
 
 ## 默认行为

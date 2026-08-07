@@ -107,14 +107,18 @@ class ResearchClaim(BaseModel):
 
 class VerificationSummary(BaseModel):
     market_status: Literal["verified", "not_required", "failed"] = "failed"
-    semantic_status: Literal["verified", "unverified"] = "unverified"
-    fact_status: Literal["verified", "unverified"] = "unverified"
+    semantic_status: Literal["verified", "partially_verified", "unverified"] = "unverified"
+    fact_status: Literal["verified", "partially_verified", "unverified"] = "unverified"
     market_snapshots: list[MarketSnapshot] = Field(default_factory=list)
     research_claims: list[ResearchClaim] = Field(default_factory=list)
     fact_evidence: list[FactEvidence] = Field(default_factory=list)
     errors: list[str] = Field(default_factory=list)
     uncovered_opinion_ids: list[str] = Field(default_factory=list)
     uncovered_claim_ids: list[str] = Field(default_factory=list)
+    included_opinion_ids: list[str] = Field(default_factory=list)
+    excluded_opinion_ids: list[str] = Field(default_factory=list)
+    excluded_claim_ids: list[str] = Field(default_factory=list)
+    exclusion_reasons: dict[str, str] = Field(default_factory=dict)
 
     @computed_field  # type: ignore[prop-decorator]
     @property
@@ -124,6 +128,12 @@ class VerificationSummary(BaseModel):
             and self.semantic_status == "verified"
             and self.fact_status == "verified"
         )
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def ready_for_delivery(self) -> bool:
+        """A partial report is safe once failed content is isolated from analysis."""
+        return self.market_status in {"verified", "not_required"}
 
 
 class CollectionResult(BaseModel):

@@ -39,10 +39,13 @@ class FakeQuotes:
 
 def test_verification_requires_semantic_classification_for_every_formal_opinion():
     result = verify_research([opinion()], [], [], FakeQuotes())
-    assert result.market_status == "verified"
+    assert result.market_status == "not_required"
     assert result.semantic_status == "unverified"
     assert result.uncovered_opinion_ids == ["op-1"]
+    assert result.excluded_opinion_ids == ["op-1"]
+    assert result.included_opinion_ids == []
     assert not result.ready_for_final
+    assert result.ready_for_delivery
 
 
 def test_subjective_claim_does_not_require_independent_fact_evidence():
@@ -84,7 +87,7 @@ def test_factual_claim_requires_independent_evidence():
     assert result.market_snapshots[0].change_pct == 2.04
 
 
-def test_market_verification_includes_nonformal_opinions_and_claim_symbols():
+def test_market_verification_excludes_nonformal_opinions_and_their_claim_symbols():
     nonformal = opinion().model_copy(update={"formal": False, "symbol": "SH600276"})
     claim = ResearchClaim(
         claim_id="claim-1",
@@ -94,8 +97,48 @@ def test_market_verification_includes_nonformal_opinions_and_claim_symbols():
         symbols=["SH600276"],
     )
     result = verify_research([nonformal], [claim], [], FakeQuotes())
+    assert result.market_status == "not_required"
+    assert result.market_snapshots == []
+
+
+def test_partial_semantic_coverage_excludes_only_unclassified_opinion():
+    second = opinion().model_copy(
+        update={"opinion_id": "op-2", "post_id": "post-2", "symbol": None, "topic": "云服务"}
+    )
+    claim = ResearchClaim(
+        claim_id="claim-1",
+        text="作者主观看好公司",
+        kind="subjective",
+        opinion_ids=["op-1"],
+        symbols=["SH600276"],
+    )
+
+    result = verify_research([opinion(), second], [claim], [], FakeQuotes())
+
+    assert result.semantic_status == "partially_verified"
+    assert result.included_opinion_ids == ["op-1"]
+    assert result.excluded_opinion_ids == ["op-2"]
     assert result.market_status == "verified"
-    assert result.market_snapshots[0].symbol == "SH600276"
+    assert result.ready_for_delivery
+    assert not result.ready_for_final
+
+
+def test_unsupported_factual_claim_excludes_related_opinion():
+    claim = ResearchClaim(
+        claim_id="claim-1",
+        text="公司公告确认订单增长",
+        kind="factual",
+        opinion_ids=["op-1"],
+        symbols=["SH600276"],
+    )
+
+    result = verify_research([opinion()], [claim], [], FakeQuotes())
+
+    assert result.fact_status == "unverified"
+    assert result.included_opinion_ids == []
+    assert result.excluded_opinion_ids == ["op-1"]
+    assert result.market_status == "not_required"
+    assert result.ready_for_delivery
 
 
 class FakeMultiQuotes:

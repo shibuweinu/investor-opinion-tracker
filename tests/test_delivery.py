@@ -59,11 +59,22 @@ def test_require_verified_result_accepts_ready_report(tmp_path: Path) -> None:
     require_verified_result(verification)
 
 
+def test_require_verified_result_accepts_safe_partial_report(tmp_path: Path) -> None:
+    verification = tmp_path / "report.json"
+    verification.write_text(
+        '{"status":"complete","verification":'
+        '{"ready_for_final":false,"ready_for_delivery":true}}',
+        encoding="utf-8",
+    )
+    require_verified_result(verification)
+
+
 @pytest.mark.parametrize(
     "payload",
     [
         '{"status":"incomplete","verification":{"ready_for_final":true}}',
-        '{"status":"complete","verification":{"ready_for_final":false}}',
+        '{"status":"complete","verification":'
+        '{"ready_for_final":false,"ready_for_delivery":false}}',
         "{}",
     ],
 )

@@ -81,8 +81,9 @@ def execute_confirmed(
 昵称或行业映射必须标记“Agent 推导”。证据不足的候选只能进入观察项。
 先生成 `claims.json`：每条正式观点必须归入主观或事实主张，重点标的写入 `symbols`；再通过
 `analyze-file --workspace ... --claims ... --fact-evidence ...` 核验门禁。只有事实主张要求公司、
-交易所、监管、政府或公告等独立证据；任一门禁未通过时只能保留 `UNVERIFIED.md`，不得交付
-`report.md`。
+交易所、监管、政府或公告等独立证据。语义归因或事实核验失败的内容必须从观点共识、候选
+评分和标的结论中排除，并在报告中列明；完成隔离后可生成部分验证的 `report.md`。行情核验
+失败或抓取不完整时仍只能保留 `UNVERIFIED.md`，不得交付正式报告。
 
 {position_rule}
 

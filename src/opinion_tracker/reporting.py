@@ -25,6 +25,15 @@ def render_markdown(result: RunResult, profile: TraderProfile, generated_at: dat
         or "| 暂无 | - | - | - | - | - |"
     )
     errors = "；".join(verification.errors) or "无"
+    opinions_by_id = {item.opinion_id: item for item in result.opinions}
+    excluded_rows = []
+    for opinion_id in verification.excluded_opinion_ids:
+        opinion = opinions_by_id.get(opinion_id)
+        source = f"（[{opinion.topic}]({opinion.source_url})）" if opinion else ""
+        reason = verification.exclusion_reasons.get(opinion_id, "未通过核验")
+        excluded_rows.append(f"- `{opinion_id}`{source}：{reason}")
+    excluded_text = "\n".join(excluded_rows) or "- 无"
+    report_level = "全部验证" if verification.ready_for_final else "部分验证（失败内容已隔离）"
     return f"""# 投资者观点跟踪报告
 
 - 生成时间：{generated_at.isoformat()}
@@ -34,10 +43,20 @@ def render_markdown(result: RunResult, profile: TraderProfile, generated_at: dat
 - 行情核验：{verification.market_status}
 - 语义归类：{verification.semantic_status}
 - 独立事实核验：{verification.fact_status}
+- 报告级别：{report_level}
 
 ## 观点摘要
 
 共抓取 {result.posts_collected} 条，识别 {len(result.opinions)} 条观点。
+
+- 纳入分析：{len(verification.included_opinion_ids)} 条
+- 排除内容：{len(verification.excluded_opinion_ids)} 条
+
+## 排除内容
+
+以下内容不参与观点共识、候选评分或标的结论：
+
+{excluded_text}
 
 ## 交易候选
 
@@ -62,7 +81,7 @@ def render_markdown(result: RunResult, profile: TraderProfile, generated_at: dat
 def write_artifacts(directory: Path, result: RunResult, profile: TraderProfile) -> dict[str, Path]:
     directory.mkdir(parents=True, exist_ok=True)
     now = datetime.now().astimezone()
-    final_ready = result.status == "complete" and result.verification.ready_for_final
+    final_ready = result.status == "complete" and result.verification.ready_for_delivery
     markdown_name = "report.md" if final_ready else "UNVERIFIED.md"
     paths = {"markdown": directory / markdown_name, "json": directory / "report.json"}
     paths["markdown"].write_text(render_markdown(result, profile, now), encoding="utf-8")
