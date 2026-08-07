@@ -24,3 +24,9 @@ def test_config_repo_previews_without_import(tmp_path):
     assert result.exit_code == 0
     assert "等待确认导入" in result.stdout
     assert TaskStore(workspace).load().status == "onboarding_required"
+
+
+def test_cli_exposes_config_preflight_command():
+    result = runner.invoke(app, ["--help"])
+    assert result.exit_code == 0
+    assert "config-preflight" in result.stdout

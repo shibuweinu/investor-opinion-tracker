@@ -26,6 +26,7 @@ from .scheduling import schedule_hint
 from .schemas import FactEvidence, NormalizedPost, ResearchClaim, RunResult, TaskDraft, TraderProfile
 from .scoring import score_candidate
 from .sync_models import PortableConfig
+from .sync_preflight import preflight_scheduled_run
 from .task_state import TaskStore
 from .verification import verify_research
 
@@ -311,6 +312,25 @@ def config_trust(
         raise typer.Abort()
     DeviceTrustStore(KeychainTrustBackend(canonical)).authorize(preview)
     typer.echo("本设备已授权 trusted-auto-apply。")
+
+
+@app.command("config-preflight")
+def config_preflight(workspace: Annotated[Path, typer.Option("--workspace")]) -> None:
+    """定时任务运行前拉取并校验个人配置。"""
+    service = _sync_service(workspace)
+    assert service.repository is not None
+    service.repository.clone_or_open()
+    canonical = service.repository.canonical_remote()
+    identity = RepositoryIdentity(
+        canonical_remote=canonical,
+        owner=canonical.split("/")[-2],
+        git_identity=service.repository._run("config", "user.email"),
+    )
+    trusted = DeviceTrustStore(KeychainTrustBackend(canonical)).is_trusted(identity)
+    result = preflight_scheduled_run(service, locally_trusted=trusted)
+    typer.echo(json.dumps({"action": result.action, "message": result.message}, ensure_ascii=False))
+    if result.action == "confirmation_required":
+        raise typer.Exit(code=2)
 
 
 @app.command("analyze-file")
