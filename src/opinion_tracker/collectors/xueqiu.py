@@ -26,6 +26,8 @@ class XueqiuCollector:
         if not request.authorization_confirmed:
             return CollectionResult(status="failed", warnings=["缺少授权声明"])
         start = (request.as_of or datetime.now(UTC)) - timedelta(days=request.lookback_days)
+        if request.since is not None:
+            start = max(start, request.since)
         page = int(cursor or 1)
         posts: list[NormalizedPost] = []
         warnings: list[str] = []
@@ -34,8 +36,20 @@ class XueqiuCollector:
                 if page > int(cursor or 1):
                     self.sleeper(1 / request.qps)
                 payload = self.browser.fetch_timeline(request.user_id, page, 20)
+                if payload.get("access_verification"):
+                    return CollectionResult(
+                        status="incomplete" if posts else "failed",
+                        posts=posts,
+                        next_cursor=str(page),
+                        warnings=["雪球访问验证：需要人工完成滑块，已停止采集"],
+                    )
                 if payload.get("login_required"):
-                    return CollectionResult(status="failed", next_cursor=str(page), warnings=["需要登录雪球"])
+                    return CollectionResult(
+                        status="incomplete" if posts else "failed",
+                        posts=posts,
+                        next_cursor=str(page),
+                        warnings=["雪球登录失效：请在任务使用的浏览器中重新登录"],
+                    )
                 items = payload.get("list", [])
                 for raw in items:
                     published = datetime.fromtimestamp(raw["created_at"] / 1000, tz=UTC)

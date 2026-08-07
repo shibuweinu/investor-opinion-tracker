@@ -54,3 +54,29 @@ def test_confirmed_execution_collects_and_writes_report(tmp_path):
     assert "不得输出仓位" in instructions
     assert not (tmp_path / "reports" / "report.md").exists()
     assert TaskStore(tmp_path).load().status == "completed"
+
+
+def test_execution_stops_remaining_users_on_access_verification(tmp_path):
+    class RiskCollector:
+        def __init__(self):
+            self.calls = 0
+
+        def collect(self, request):
+            self.calls += 1
+            return CollectionResult(
+                status="failed",
+                warnings=["雪球访问验证：需要人工完成滑块，已停止采集"],
+            )
+
+    store = TaskStore(tmp_path)
+    store.save_draft(
+        TaskDraft(user_urls=["https://xueqiu.com/u/1", "https://xueqiu.com/u/2"])
+    )
+    store.confirm()
+    collector = RiskCollector()
+
+    result = execute_confirmed(tmp_path, tmp_path / "reports", collector)
+
+    assert result.status == "incomplete"
+    assert collector.calls == 1
+    assert "已停止后续账号采集，避免扩大风控或重复触发验证" in result.warnings

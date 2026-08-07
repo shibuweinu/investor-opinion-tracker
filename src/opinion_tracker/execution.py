@@ -41,6 +41,7 @@ def execute_confirmed(
                 qps=draft.qps,
                 authorization_confirmed=draft.authorization_confirmed,
                 as_of=until,
+                since=since,
             )
         )
         posts.extend(
@@ -50,6 +51,9 @@ def execute_confirmed(
         )
         warnings.extend(collected.warnings)
         complete = complete and collected.status == "complete"
+        if any("雪球访问验证" in warning or "雪球登录失效" in warning for warning in collected.warnings):
+            warnings.append("已停止后续账号采集，避免扩大风控或重复触发验证")
+            break
     result = RunResult(
         status="complete" if complete else "incomplete",
         posts_collected=len(posts),

@@ -20,6 +20,7 @@ class RunRequest(BaseModel):
     qps: float = Field(default=1.0, gt=0, le=1.0)
     authorization_confirmed: bool = True
     as_of: datetime | None = None
+    since: datetime | None = None
 
     @computed_field  # type: ignore[prop-decorator]
     @property

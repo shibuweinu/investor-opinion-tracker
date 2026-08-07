@@ -8,7 +8,11 @@ from opinion_tracker.schemas import CollectionResult, NormalizedPost
 
 
 class Collector:
+    def __init__(self):
+        self.requests = []
+
     def collect(self, request):
+        self.requests.append(request)
         now = request.as_of or datetime.now(UTC)
         return CollectionResult(
             status="complete",
@@ -40,9 +44,11 @@ def test_jobs_materialize_confirm_and_filter_incremental_window(tmp_path):
     store.confirm("morning")
     cutoff = datetime(2026, 8, 7, 9, tzinfo=UTC)
     store.mark_success("evening", cutoff - timedelta(hours=12))
-    result = store.run("morning", tmp_path / "out", cutoff, collector=Collector())
+    collector = Collector()
+    result = store.run("morning", tmp_path / "out", cutoff, collector=collector)
     assert result.posts_collected == 1
     assert store.window("morning", cutoff).since == cutoff - timedelta(hours=12)
+    assert {request.since for request in collector.requests} == {cutoff - timedelta(hours=12)}
 
 
 def test_checkpoint_advances_only_after_verified_completion(tmp_path):
