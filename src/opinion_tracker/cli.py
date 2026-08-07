@@ -8,6 +8,8 @@ from typing import Annotated, Literal
 import typer
 
 from .config import Settings
+from .config_sync import ConfigSyncService
+from .device_trust import DeviceTrustStore, KeychainTrustBackend, RepositoryIdentity
 from .delivery import (
     prompt_and_store_auth_code,
     require_verified_result,
@@ -16,6 +18,7 @@ from .delivery import (
     smtp_settings_for,
 )
 from .execution import execute_confirmed
+from .git_repository import GitRepository
 from .onboarding import landing_text, task_summary, write_landing
 from .opinions import extract_opinions
 from .reporting import write_artifacts
@@ -23,6 +26,7 @@ from .scheduling import schedule_hint
 from .schemas import FactEvidence, NormalizedPost, ResearchClaim, RunResult, TaskDraft, TraderProfile
 from .scoring import score_candidate
 from .task_state import TaskStore
+from .sync_models import PortableConfig
 from .verification import verify_research
 
 app = typer.Typer(help="可移植的投资者观点跟踪与交易研究工具")
@@ -32,6 +36,7 @@ app = typer.Typer(help="可移植的投资者观点跟踪与交易研究工具")
 def init(
     workspace: Annotated[Path | None, typer.Option(help="数据工作目录")] = None,
     no_interactive: Annotated[bool, typer.Option("--no-interactive")] = False,
+    config_repo: Annotated[str | None, typer.Option("--config-repo")] = None,
 ) -> None:
     workspace = workspace or Path.cwd()
     path = workspace / ".investor-opinion-tracker" / "config.json"
@@ -42,8 +47,14 @@ def init(
     typer.echo(f"已创建配置：{path}")
     typer.echo(f"使用指南：{landing}")
     TaskStore(workspace).load()
+    if config_repo:
+        repository = GitRepository(config_repo, workspace / ".investor-opinion-tracker" / "config-repo")
+        ConfigSyncService(workspace, repository).connect()
+        typer.echo(f"已连接并预览配置仓库：{repository.canonical_remote()}；等待确认导入。")
     if no_interactive:
         typer.echo("等待收集任务需求：Agent 应先询问用户，再运行 onboard。")
+        if not config_repo:
+            typer.echo('远端配置未绑定；可选动作：restore（恢复）、create（创建）、skip（跳过）。')
     else:
         typer.echo("即将进入 onboarding；确认任务摘要之前不会抓取。")
         if typer.confirm("现在开始填写第一次任务？", default=True):
@@ -216,6 +227,81 @@ def welcome(workspace: Annotated[Path | None, typer.Option()] = None) -> None:
     """显示初始化使用指南。"""
     workspace = workspace or Path.cwd()
     typer.echo(landing_text(Settings.load(workspace)))
+
+
+def _sync_service(workspace: Path) -> ConfigSyncService:
+    binding_path = workspace / ".investor-opinion-tracker" / "sync-binding.json"
+    if not binding_path.exists():
+        raise typer.BadParameter("尚未绑定配置仓库，请先运行 config-connect")
+    remote = json.loads(binding_path.read_text())["remote_url"]
+    return ConfigSyncService(
+        workspace, GitRepository(remote, workspace / ".investor-opinion-tracker" / "config-repo")
+    )
+
+
+@app.command("config-connect")
+def config_connect(
+    workspace: Annotated[Path, typer.Option("--workspace")],
+    repo: Annotated[str, typer.Option("--repo")],
+) -> None:
+    binding = ConfigSyncService(
+        workspace, GitRepository(repo, workspace / ".investor-opinion-tracker" / "config-repo")
+    ).connect()
+    typer.echo(f"已绑定：{binding.canonical_remote}")
+
+
+@app.command("config-status")
+def config_status(workspace: Annotated[Path, typer.Option("--workspace")]) -> None:
+    path = workspace / ".investor-opinion-tracker" / "sync-binding.json"
+    typer.echo(path.read_text() if path.exists() else '{"status":"unbound"}')
+
+
+@app.command("config-push")
+def config_push(
+    workspace: Annotated[Path, typer.Option("--workspace")],
+    config_file: Annotated[Path | None, typer.Option("--config-file")] = None,
+    yes: Annotated[bool, typer.Option("--yes")] = False,
+) -> None:
+    path = config_file or workspace / ".investor-opinion-tracker" / "portable-config.json"
+    document = PortableConfig.model_validate_json(path.read_text())
+    if not yes and not typer.confirm("推送以上白名单个人配置？"):
+        raise typer.Abort()
+    commit = _sync_service(workspace).push(document)
+    typer.echo(f"配置已推送：{commit}")
+
+
+@app.command("config-pull")
+def config_pull(
+    workspace: Annotated[Path, typer.Option("--workspace")],
+    yes: Annotated[bool, typer.Option("--yes")] = False,
+) -> None:
+    service = _sync_service(workspace)
+    document = service.load_remote()
+    typer.echo(document.model_dump_json(indent=2))
+    if not yes and not typer.confirm("导入以上配置为待确认任务？"):
+        raise typer.Abort()
+    target = workspace / ".investor-opinion-tracker" / "portable-config.json"
+    target.write_text(document.model_dump_json(indent=2), encoding="utf-8")
+    service.apply_document(document, report_kind="daily", role="research", trusted=False)
+    typer.echo("配置已导入；执行前请确认任务摘要。")
+
+
+@app.command("config-trust")
+def config_trust(
+    workspace: Annotated[Path, typer.Option("--workspace")],
+    yes: Annotated[bool, typer.Option("--yes")] = False,
+) -> None:
+    service = _sync_service(workspace)
+    assert service.repository is not None
+    canonical = service.repository.canonical_remote()
+    owner = canonical.split("/")[-2]
+    identity = service.repository._run("config", "user.email")
+    preview = RepositoryIdentity(canonical_remote=canonical, owner=owner, git_identity=identity)
+    typer.echo(preview.model_dump_json(indent=2))
+    if not yes and not typer.confirm("信任该仓库并自动应用后续合法更新？"):
+        raise typer.Abort()
+    DeviceTrustStore(KeychainTrustBackend(canonical)).authorize(preview)
+    typer.echo("本设备已授权 trusted-auto-apply。")
 
 
 @app.command("analyze-file")
