@@ -9,7 +9,6 @@ import typer
 
 from .config import Settings
 from .config_sync import ConfigSyncService
-from .device_trust import DeviceTrustStore, KeychainTrustBackend, RepositoryIdentity
 from .delivery import (
     prompt_and_store_auth_code,
     require_verified_result,
@@ -17,6 +16,7 @@ from .delivery import (
     send_test,
     smtp_settings_for,
 )
+from .device_trust import DeviceTrustStore, KeychainTrustBackend, RepositoryIdentity
 from .execution import execute_confirmed
 from .git_repository import GitRepository
 from .onboarding import landing_text, task_summary, write_landing
@@ -25,8 +25,8 @@ from .reporting import write_artifacts
 from .scheduling import schedule_hint
 from .schemas import FactEvidence, NormalizedPost, ResearchClaim, RunResult, TaskDraft, TraderProfile
 from .scoring import score_candidate
-from .task_state import TaskStore
 from .sync_models import PortableConfig
+from .task_state import TaskStore
 from .verification import verify_research
 
 app = typer.Typer(help="可移植的投资者观点跟踪与交易研究工具")
@@ -54,7 +54,7 @@ def init(
     if no_interactive:
         typer.echo("等待收集任务需求：Agent 应先询问用户，再运行 onboard。")
         if not config_repo:
-            typer.echo('远端配置未绑定；可选动作：restore（恢复）、create（创建）、skip（跳过）。')
+            typer.echo("远端配置未绑定；可选动作：restore（恢复）、create（创建）、skip（跳过）。")
     else:
         typer.echo("即将进入 onboarding；确认任务摘要之前不会抓取。")
         if typer.confirm("现在开始填写第一次任务？", default=True):
@@ -124,8 +124,17 @@ def onboard(
     if not user_urls:
         _onboard_interactive(workspace)
         return
-    _save_onboarding(workspace, user_urls, lookback_days, report_type, accept_default_profile,
-                     style, aggressiveness, max_loss_per_trade_pct, include_position_sizing)
+    _save_onboarding(
+        workspace,
+        user_urls,
+        lookback_days,
+        report_type,
+        accept_default_profile,
+        style,
+        aggressiveness,
+        max_loss_per_trade_pct,
+        include_position_sizing,
+    )
 
 
 @app.command("task-status")
@@ -309,9 +318,7 @@ def analyze_file(
     input_path: Annotated[Path, typer.Option("--input", exists=True, readable=True)],
     output: Annotated[Path, typer.Option("--output")],
     workspace: Annotated[Path | None, typer.Option("--workspace")] = None,
-    claims_path: Annotated[
-        Path | None, typer.Option("--claims", exists=True, readable=True)
-    ] = None,
+    claims_path: Annotated[Path | None, typer.Option("--claims", exists=True, readable=True)] = None,
     fact_evidence_path: Annotated[
         Path | None, typer.Option("--fact-evidence", exists=True, readable=True)
     ] = None,

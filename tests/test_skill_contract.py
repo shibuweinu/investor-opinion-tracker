@@ -32,3 +32,10 @@ def test_all_agent_guides_require_confirmed_onboarding():
     assert "确认前不得抓取" in skill
     for phrase in ["evidence-pack.json", "ANALYZE.md", "Agent 推导", "仓位建议默认关闭"]:
         assert phrase in skill
+
+
+def test_agent_guides_explain_private_config_choices_and_trust():
+    for name in ["README.md", "SKILL.md", "references/workbuddy.md"]:
+        text = (ROOT / name).read_text(encoding="utf-8")
+        for phrase in ["config-connect", "restore", "create", "skip", "trusted_auto_apply"]:
+            assert phrase in text, f"{name} missing {phrase}"

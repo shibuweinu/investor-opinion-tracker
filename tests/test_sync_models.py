@@ -11,17 +11,20 @@ from opinion_tracker.task_state import TaskStore
 def payload() -> dict:
     return {
         "schema_version": 1,
-        "tracked_accounts": [
-            {"url": "https://xueqiu.com/u/1", "display_name": "博主", "role": "research"}
-        ],
+        "tracked_accounts": [{"url": "https://xueqiu.com/u/1", "display_name": "博主", "role": "research"}],
         "reports": {
-            "daily": {"lookback_days_by_role": {"research": 5, "auxiliary_news": 2},
-                      "weekdays": [1, 2, 3, 4, 5], "hour": 21},
-            "weekly": {"lookback_days_by_role": {"research": 7, "auxiliary_news": 7},
-                       "weekdays": [0], "hour": 18},
+            "daily": {
+                "lookback_days_by_role": {"research": 5, "auxiliary_news": 2},
+                "weekdays": [1, 2, 3, 4, 5],
+                "hour": 21,
+            },
+            "weekly": {
+                "lookback_days_by_role": {"research": 7, "auxiliary_news": 7},
+                "weekdays": [0],
+                "hour": 18,
+            },
         },
-        "trader_profile": {"style": "mixed", "aggressiveness": "balanced",
-                           "max_loss_per_trade_pct": 3},
+        "trader_profile": {"style": "mixed", "aggressiveness": "balanced", "max_loss_per_trade_pct": 3},
         "report_preferences": {"include_position_sizing": False},
         "sync": {"trusted_auto_apply": True},
         "updated_at": datetime.now(UTC).isoformat(),

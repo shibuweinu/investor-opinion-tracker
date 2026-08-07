@@ -18,8 +18,9 @@ def test_config_repo_previews_without_import(tmp_path):
     remote = tmp_path / "remote.git"
     subprocess.run(["git", "init", "--bare", str(remote)], check=True, capture_output=True)
     workspace = tmp_path / "work"
-    result = runner.invoke(app, ["init", "--workspace", str(workspace), "--no-interactive",
-                                 "--config-repo", str(remote)])
+    result = runner.invoke(
+        app, ["init", "--workspace", str(workspace), "--no-interactive", "--config-repo", str(remote)]
+    )
     assert result.exit_code == 0
     assert "等待确认导入" in result.stdout
     assert TaskStore(workspace).load().status == "onboarding_required"

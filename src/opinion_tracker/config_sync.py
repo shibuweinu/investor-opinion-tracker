@@ -58,15 +58,24 @@ class ConfigSyncService:
         self.apply_document(self.load_remote(), report_kind="daily", role="research", trusted=True)
 
     def apply_document(
-        self, document: PortableConfig, *, report_kind: Literal["daily", "weekly"],
-        role: Literal["research", "auxiliary_news"], trusted: bool,
+        self,
+        document: PortableConfig,
+        *,
+        report_kind: Literal["daily", "weekly"],
+        role: Literal["research", "auxiliary_news"],
+        trusted: bool,
     ) -> TaskRecord:
         schedule = document.reports[report_kind]
         urls = [str(account.url) for account in document.tracked_accounts if account.role == role]
-        draft = TaskDraft(
-            user_urls=urls, lookback_days=schedule.lookback_days_by_role[role], qps=1,
-            report_type=report_kind, trader_profile=document.trader_profile,
-            include_position_sizing=document.report_preferences.include_position_sizing,
+        draft = TaskDraft.model_validate(
+            {
+                "user_urls": urls,
+                "lookback_days": schedule.lookback_days_by_role[role],
+                "qps": 1,
+                "report_type": report_kind,
+                "trader_profile": document.trader_profile,
+                "include_position_sizing": document.report_preferences.include_position_sizing,
+            }
         )
         store = TaskStore(self.workspace)
         record = store.confirm_auto_applied(draft, document.revision) if trusted else store.save_draft(draft)
@@ -76,7 +85,9 @@ class ConfigSyncService:
     def _audit(self, action: str, commit: str | None, document: PortableConfig) -> None:
         self.state_dir.mkdir(parents=True, exist_ok=True)
         entry = SyncAuditEntry(
-            occurred_at=datetime.now(UTC), action=action, new_commit=commit,
+            occurred_at=datetime.now(UTC),
+            action=action,
+            new_commit=commit,
             revision=document.revision,
         )
         with (self.state_dir / "sync-audit.jsonl").open("a", encoding="utf-8") as stream:

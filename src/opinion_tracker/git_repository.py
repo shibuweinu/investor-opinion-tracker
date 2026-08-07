@@ -26,8 +26,12 @@ class GitRepository:
     def _run(self, *args: str, cwd: Path | None = None, check: bool = True) -> str:
         try:
             result = subprocess.run(
-                ["git", *args], cwd=cwd or self.path, check=check,
-                capture_output=True, text=True, timeout=self.timeout,
+                ["git", *args],
+                cwd=cwd or self.path,
+                check=check,
+                capture_output=True,
+                text=True,
+                timeout=self.timeout,
             )
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
             raise GitError(str(exc)) from exc
@@ -62,8 +66,10 @@ class GitRepository:
 
     def is_ancestor(self, older: str, newer: str) -> bool:
         result = subprocess.run(
-            ["git", "merge-base", "--is-ancestor", older, newer], cwd=self.path,
-            capture_output=True, timeout=self.timeout,
+            ["git", "merge-base", "--is-ancestor", older, newer],
+            cwd=self.path,
+            capture_output=True,
+            timeout=self.timeout,
         )
         return result.returncode == 0
 

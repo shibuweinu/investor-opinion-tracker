@@ -26,6 +26,8 @@ python3.11 -m venv .venv
 
 `init --no-interactive` 会生成初始化 landing，但不会等待输入、创建默认博主或开始抓取。Agent 接下来询问用户需求，调用 `onboard` 保存草稿，以 `task-summary` 展示完整摘要；只有用户明确确认后才调用 `task-confirm` 和 `run`。示例 URL 永远不是默认目标。
 
+新设备会提示 `restore`（恢复已有私有配置仓库）、`create`（创建个人私有配置仓库）或 `skip`（仅本地使用）。它不会静默拉取配置。也可传入 `init --config-repo <git-url>` 只连接并预览，确认后再执行 `config-pull`。绑定命令为 `config-connect`；完整流程见 [个人配置同步](docs/config-sync.md)。远端 `trusted_auto_apply` 只有在每台设备单独授权后才生效。
+
 ```bash
 .venv/bin/opinion-tracker onboard --workspace ./data --user-url https://xueqiu.com/u/USER_ID --lookback-days 5 --report-type daily --accept-default-profile
 .venv/bin/opinion-tracker task-summary --workspace ./data

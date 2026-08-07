@@ -20,5 +20,6 @@ def test_explicit_authorization_matches_exact_identity(tmp_path):
 
 def test_revoke_removes_trust(tmp_path):
     store = DeviceTrustStore(FileTrustBackend(tmp_path / "trust.json"))
-    store.authorize(identity()); store.revoke()
+    store.authorize(identity())
+    store.revoke()
     assert not store.is_trusted(identity())

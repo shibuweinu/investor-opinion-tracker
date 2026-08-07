@@ -9,10 +9,18 @@ class FakeDocument:
 
 
 class FakeService:
-    def __init__(self, changed=True): self.changed = changed; self.applied = False
-    def update(self): return self.changed
-    def document(self): return FakeDocument(True)
-    def apply_trusted(self): self.applied = True
+    def __init__(self, changed=True):
+        self.changed = changed
+        self.applied = False
+
+    def update(self):
+        return self.changed
+
+    def document(self):
+        return FakeDocument(True)
+
+    def apply_trusted(self):
+        self.applied = True
 
 
 def test_remote_flag_without_local_trust_requires_confirmation():
