@@ -55,7 +55,51 @@ class ConfigSyncService:
         return self.load_remote()
 
     def apply_trusted(self) -> None:
-        self.apply_document(self.load_remote(), report_kind="daily", role="research", trusted=True)
+        self.apply_trusted_document(self.load_remote())
+
+    def apply_trusted_document(self, document: PortableConfig) -> None:
+        document = PortableConfig.model_validate(document.model_dump())
+        jobs: list[
+            tuple[
+                Path,
+                Literal["daily", "weekly"],
+                tuple[Literal["research", "auxiliary_news"], ...],
+            ]
+        ] = [
+            (self.workspace, "daily", ("research",)),
+            (self.workspace.parent / f"{self.workspace.name}-daily-news", "daily", ("auxiliary_news",)),
+            (
+                self.workspace.parent / f"{self.workspace.name}-weekly",
+                "weekly",
+                ("research", "auxiliary_news"),
+            ),
+        ]
+        drafts = [
+            (workspace, self._draft(document, report_kind, roles)) for workspace, report_kind, roles in jobs
+        ]
+        for workspace, draft in drafts:
+            TaskStore(workspace).confirm_auto_applied(draft, document.revision)
+        self._audit("auto_apply", None, document)
+
+    def _draft(
+        self,
+        document: PortableConfig,
+        report_kind: Literal["daily", "weekly"],
+        roles: tuple[Literal["research", "auxiliary_news"], ...],
+    ) -> TaskDraft:
+        schedule = document.reports[report_kind]
+        urls = [str(account.url) for account in document.tracked_accounts if account.role in roles]
+        lookback = max(schedule.lookback_days_by_role[role] for role in roles)
+        return TaskDraft.model_validate(
+            {
+                "user_urls": urls,
+                "lookback_days": lookback,
+                "qps": 1,
+                "report_type": report_kind,
+                "trader_profile": document.trader_profile,
+                "include_position_sizing": document.report_preferences.include_position_sizing,
+            }
+        )
 
     def apply_document(
         self,
@@ -65,18 +109,7 @@ class ConfigSyncService:
         role: Literal["research", "auxiliary_news"],
         trusted: bool,
     ) -> TaskRecord:
-        schedule = document.reports[report_kind]
-        urls = [str(account.url) for account in document.tracked_accounts if account.role == role]
-        draft = TaskDraft.model_validate(
-            {
-                "user_urls": urls,
-                "lookback_days": schedule.lookback_days_by_role[role],
-                "qps": 1,
-                "report_type": report_kind,
-                "trader_profile": document.trader_profile,
-                "include_position_sizing": document.report_preferences.include_position_sizing,
-            }
-        )
+        draft = self._draft(document, report_kind, (role,))
         store = TaskStore(self.workspace)
         record = store.confirm_auto_applied(draft, document.revision) if trusted else store.save_draft(draft)
         self._audit("auto_apply" if trusted else "pull", None, document)

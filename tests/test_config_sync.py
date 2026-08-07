@@ -54,3 +54,20 @@ def test_safe_and_trusted_pull_have_distinct_confirmation(tmp_path):
     trusted = service.apply_document(document(), report_kind="daily", role="research", trusted=True)
     assert trusted.confirmation_source == "auto_applied"
     assert TaskStore(tmp_path / "work").require_confirmed()
+
+
+def test_trusted_apply_updates_daily_research_news_and_weekly(tmp_path):
+    root = tmp_path / "data"
+    service = ConfigSyncService(root, repository=None)
+    payload = document().model_dump(mode="json")
+    payload["tracked_accounts"] = [
+        {"url": "https://xueqiu.com/u/1", "display_name": "一", "role": "research"},
+        {"url": "https://xueqiu.com/u/2", "display_name": "快讯", "role": "auxiliary_news"},
+    ]
+    config = PortableConfig.model_validate(payload)
+    service.apply_trusted_document(config)
+    assert TaskStore(root).require_confirmed().draft.lookback_days == 5
+    assert TaskStore(tmp_path / "data-daily-news").require_confirmed().draft.lookback_days == 2
+    weekly = TaskStore(tmp_path / "data-weekly").require_confirmed().draft
+    assert weekly.lookback_days == 7
+    assert len(weekly.user_urls) == 2
