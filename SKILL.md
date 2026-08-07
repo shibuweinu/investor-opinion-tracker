@@ -20,6 +20,7 @@ description: 抓取已获授权的雪球博主时间线，跟踪观点变化，�
 9. 报告完成后提示用户可以启动定时任务，但不得未经另一次确认自行创建。
 10. 远端 `trusted_auto_apply` 只是偏好；每台设备必须明确建立本机信任。定时任务运行前检查最新配置，身份、私有状态、Schema 或历史异常时不得自动应用。
 11. Schema v2 通过 `jobs list` 使用 `morning`、`evening`、`weekly` 稳定任务 ID。产品功能更新使用 `update-check`/`update`，个人配置更新使用 `config-preflight`，不得混用或覆盖用户配置。
+12. 定时入口必须调用 `jobs run-due`，它先完成远端配置预检。Agent 完成语义与行情核验并确认 `report.json` 可交付后，才调用 `jobs complete` 推进检查点；早报失败时晚报补抓，晚报失败时下一早报补抓。
 
 ## 调用方式
 

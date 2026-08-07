@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import smtplib
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Literal
 
@@ -28,7 +29,7 @@ from .reporting import write_artifacts
 from .scheduling import schedule_hint
 from .schemas import FactEvidence, NormalizedPost, ResearchClaim, RunResult, TaskDraft, TraderProfile
 from .scoring import score_candidate
-from .sync_preflight import preflight_scheduled_run
+from .sync_preflight import PreflightResult, preflight_scheduled_run
 from .task_state import TaskStore
 from .verification import verify_research
 
@@ -41,9 +42,77 @@ app.add_typer(jobs_app, name="jobs")
 def jobs_list(workspace: Annotated[Path, typer.Option("--workspace")]) -> None:
     typer.echo(
         json.dumps(
-            [job.model_dump(mode="json") for job in JobStore(workspace).list()], ensure_ascii=False, indent=2
+            [job.model_dump(mode="json") for job in JobStore(workspace).list_jobs()],
+            ensure_ascii=False,
+            indent=2,
         )
     )
+
+
+@jobs_app.command("summary")
+def jobs_summary(job_id: str, workspace: Annotated[Path, typer.Option("--workspace")]) -> None:
+    store = JobStore(workspace)
+    job = store.get(job_id)
+    record = store.task_store(job_id).load()
+    typer.echo(
+        json.dumps(
+            {"job": job.model_dump(mode="json"), "task": record.model_dump(mode="json")},
+            ensure_ascii=False,
+            indent=2,
+            default=str,
+        )
+    )
+
+
+@jobs_app.command("confirm")
+def jobs_confirm(job_id: str, workspace: Annotated[Path, typer.Option("--workspace")]) -> None:
+    JobStore(workspace).confirm(job_id)
+    typer.echo(f"任务已确认：{job_id}")
+
+
+def _parse_now(value: str | None) -> datetime:
+    return datetime.fromisoformat(value) if value else datetime.now(UTC)
+
+
+@jobs_app.command("run")
+def jobs_run(
+    job_id: str,
+    workspace: Annotated[Path, typer.Option("--workspace")],
+    output: Annotated[Path, typer.Option("--output")],
+    now: Annotated[str | None, typer.Option("--now")] = None,
+) -> None:
+    result = JobStore(workspace).run(job_id, output, _parse_now(now))
+    typer.echo(f"{job_id} 证据准备完成：{result.posts_collected} 条")
+
+
+@jobs_app.command("run-due")
+def jobs_run_due(
+    workspace: Annotated[Path, typer.Option("--workspace")],
+    output_root: Annotated[Path, typer.Option("--output-root")],
+    now: Annotated[str | None, typer.Option("--now")] = None,
+) -> None:
+    preflight = _perform_config_preflight(workspace)
+    if preflight.action == "confirmation_required":
+        typer.echo(preflight.message, err=True)
+        raise typer.Exit(code=2)
+    cutoff = _parse_now(now)
+    store = JobStore(workspace)
+    due = store.due(cutoff)
+    for job in due:
+        store.run(job.job_id, output_root / cutoff.date().isoformat() / job.job_id, cutoff)
+    typer.echo(json.dumps({"due": [job.job_id for job in due]}, ensure_ascii=False))
+
+
+@jobs_app.command("complete")
+def jobs_complete(
+    job_id: str,
+    workspace: Annotated[Path, typer.Option("--workspace")],
+    verification: Annotated[Path, typer.Option("--verification", exists=True, readable=True)],
+    cutoff: Annotated[str, typer.Option("--cutoff")],
+) -> None:
+    require_verified_result(verification)
+    JobStore(workspace).complete(job_id, datetime.fromisoformat(cutoff), verified=True)
+    typer.echo(f"{job_id} 检查点已推进")
 
 
 @app.command("update-check")
@@ -250,7 +319,7 @@ def email_send(
     address: Annotated[str, typer.Option("--address")],
     report: Annotated[Path, typer.Option("--report", exists=True, readable=True)],
     verification: Annotated[Path, typer.Option("--verification", exists=True, readable=True)],
-    kind: Annotated[Literal["daily", "weekly"], typer.Option("--kind")],
+    kind: Annotated[Literal["morning", "evening", "daily", "weekly"], typer.Option("--kind")],
 ) -> None:
     """将验证完成的日报或周报发送到网易邮箱。"""
     try:
@@ -276,6 +345,20 @@ def _sync_service(workspace: Path) -> ConfigSyncService:
     return ConfigSyncService(
         workspace, GitRepository(remote, workspace / ".investor-opinion-tracker" / "config-repo")
     )
+
+
+def _perform_config_preflight(workspace: Path) -> PreflightResult:
+    service = _sync_service(workspace)
+    assert service.repository is not None
+    service.repository.clone_or_open()
+    canonical = service.repository.canonical_remote()
+    identity = RepositoryIdentity(
+        canonical_remote=canonical,
+        owner=canonical.split("/")[-2],
+        git_identity=service.repository._run("config", "user.email"),
+    )
+    trusted = DeviceTrustStore(KeychainTrustBackend(canonical)).is_trusted(identity)
+    return preflight_scheduled_run(service, locally_trusted=trusted)
 
 
 @app.command("config-connect")
@@ -346,17 +429,7 @@ def config_trust(
 @app.command("config-preflight")
 def config_preflight(workspace: Annotated[Path, typer.Option("--workspace")]) -> None:
     """定时任务运行前拉取并校验个人配置。"""
-    service = _sync_service(workspace)
-    assert service.repository is not None
-    service.repository.clone_or_open()
-    canonical = service.repository.canonical_remote()
-    identity = RepositoryIdentity(
-        canonical_remote=canonical,
-        owner=canonical.split("/")[-2],
-        git_identity=service.repository._run("config", "user.email"),
-    )
-    trusted = DeviceTrustStore(KeychainTrustBackend(canonical)).is_trusted(identity)
-    result = preflight_scheduled_run(service, locally_trusted=trusted)
+    result = _perform_config_preflight(workspace)
     typer.echo(json.dumps({"action": result.action, "message": result.message}, ensure_ascii=False))
     if result.action == "confirmation_required":
         raise typer.Exit(code=2)

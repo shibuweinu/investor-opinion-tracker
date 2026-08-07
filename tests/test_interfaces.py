@@ -86,10 +86,17 @@ def test_task_summary_supports_json_and_custom_profile(tmp_path):
     created = runner.invoke(
         app,
         [
-            "onboard", "--workspace", str(tmp_path),
-            "--user-url", "https://xueqiu.com/u/2292705444",
-            "--style", "short_term", "--aggressiveness", "aggressive",
-            "--max-loss-per-trade-pct", "0.8",
+            "onboard",
+            "--workspace",
+            str(tmp_path),
+            "--user-url",
+            "https://xueqiu.com/u/2292705444",
+            "--style",
+            "short_term",
+            "--aggressiveness",
+            "aggressive",
+            "--max-loss-per-trade-pct",
+            "0.8",
         ],
     )
     assert created.exit_code == 0
@@ -119,9 +126,13 @@ def test_onboard_accepts_multiple_user_urls(tmp_path):
     out = CliRunner().invoke(
         app,
         [
-            "onboard", "--workspace", str(tmp_path),
-            "--user-url", "https://xueqiu.com/u/111",
-            "--user-url", "https://xueqiu.com/u/222",
+            "onboard",
+            "--workspace",
+            str(tmp_path),
+            "--user-url",
+            "https://xueqiu.com/u/111",
+            "--user-url",
+            "https://xueqiu.com/u/222",
             "--accept-default-profile",
         ],
     )
@@ -181,8 +192,13 @@ def test_cli_analyze_file_uses_workspace_profile_when_verified(tmp_path, monkeyp
     out = CliRunner().invoke(
         app,
         [
-            "analyze-file", "--workspace", str(tmp_path), "--input", str(source),
-            "--output", str(tmp_path / "reports"),
+            "analyze-file",
+            "--workspace",
+            str(tmp_path),
+            "--input",
+            str(source),
+            "--output",
+            str(tmp_path / "reports"),
         ],
     )
     assert out.exit_code == 0

@@ -46,11 +46,16 @@ def test_build_test_message_does_not_read_path() -> None:
     assert "配置成功" in message.get_content()
 
 
+@pytest.mark.parametrize(("kind", "label"), [("morning", "早报"), ("evening", "晚报")])
+def test_build_report_message_distinguishes_morning_evening(tmp_path: Path, kind: str, label: str):
+    report = tmp_path / "report.md"
+    report.write_text("# report", encoding="utf-8")
+    assert label in str(build_report_message("user@163.com", report, kind)["Subject"])
+
+
 def test_require_verified_result_accepts_ready_report(tmp_path: Path) -> None:
     verification = tmp_path / "report.json"
-    verification.write_text(
-        '{"status":"complete","verification":{"ready_for_final":true}}', encoding="utf-8"
-    )
+    verification.write_text('{"status":"complete","verification":{"ready_for_final":true}}', encoding="utf-8")
     require_verified_result(verification)
 
 

@@ -8,6 +8,7 @@ class PreflightService(Protocol):
     def update(self) -> bool: ...
     def document(self) -> object: ...
     def apply_trusted(self) -> None: ...
+    def ensure_local(self, *, trusted: bool) -> None: ...
 
 
 @dataclass
@@ -20,6 +21,7 @@ def preflight_scheduled_run(service: PreflightService, *, locally_trusted: bool)
     try:
         changed = service.update()
         if not changed:
+            service.ensure_local(trusted=locally_trusted)
             return PreflightResult("run")
         document = service.document()
         requested = bool(

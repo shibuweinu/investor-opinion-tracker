@@ -6,8 +6,12 @@ from opinion_tracker.schemas import NormalizedPost
 
 def post(identity, author, text):
     return NormalizedPost(
-        platform="xueqiu", platform_post_id=identity, author_id=author,
-        published_at=datetime.now(UTC), text=text, url=f"https://xueqiu.com/{author}/{identity}"
+        platform="xueqiu",
+        platform_post_id=identity,
+        author_id=author,
+        published_at=datetime.now(UTC),
+        text=text,
+        url=f"https://xueqiu.com/{author}/{identity}",
     )
 
 

@@ -9,7 +9,7 @@ from opinion_tracker.job_state import JobStore
 def test_materializes_jobs_without_external_paths(tmp_path):
     store = JobStore(tmp_path)
     store.materialize(migrate_portable_config(payload()))
-    assert [job.job_id for job in store.list()] == ["evening", "morning", "weekly"]
+    assert [job.job_id for job in store.list_jobs()] == ["evening", "morning", "weekly"]
 
 
 def test_failure_does_not_advance_checkpoint(tmp_path):
@@ -19,4 +19,4 @@ def test_failure_does_not_advance_checkpoint(tmp_path):
     cutoff = datetime(2026, 8, 7, 9, tzinfo=UTC)
     assert store.window("morning", cutoff).since is None
     store.mark_success("morning", cutoff)
-    assert store.window("morning", cutoff).since == cutoff
+    assert store.window("evening", cutoff).since == cutoff

@@ -102,8 +102,14 @@ class FakeMultiQuotes:
         assert codes == ["600276", "600519"]
         return [
             TdxQuote(
-                code=code, price=50, previous_close=49, open=49, high=50,
-                low=49, volume_hands=100, amount=5000,
+                code=code,
+                price=50,
+                previous_close=49,
+                open=49,
+                high=50,
+                low=49,
+                volume_hands=100,
+                amount=5000,
             )
             for code in codes
         ]
@@ -119,8 +125,11 @@ def test_market_verification_scans_every_explicit_symbol_in_post_text():
         url="https://xueqiu.com/u/post-1",
     )
     claim = ResearchClaim(
-        claim_id="claim-1", text="比较两只股票", kind="subjective",
-        opinion_ids=["op-1"], symbols=[],
+        claim_id="claim-1",
+        text="比较两只股票",
+        kind="subjective",
+        opinion_ids=["op-1"],
+        symbols=[],
     )
     result = verify_research([opinion()], [claim], [], FakeMultiQuotes(), posts=[post])
     assert [item.symbol for item in result.market_snapshots] == ["SH600276", "SH600519"]

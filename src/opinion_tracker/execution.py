@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from pathlib import Path
 from typing import Protocol
 
 from .collectors.external_chrome import ExternalChromeXueqiuCollector
 from .evidence import build_evidence_pack
-from .schemas import CollectionResult, RunRequest, RunResult
+from .schemas import CollectionResult, NormalizedPost, RunRequest, RunResult
 from .task_state import TaskStore
 
 
@@ -14,24 +15,39 @@ class Collector(Protocol):
     def collect(self, request: RunRequest) -> CollectionResult: ...
 
 
-def execute_confirmed(workspace: Path, output: Path, collector: Collector | None = None) -> RunResult:
+def execute_confirmed(
+    workspace: Path,
+    output: Path,
+    collector: Collector | None = None,
+    *,
+    since: datetime | None = None,
+    until: datetime | None = None,
+    complete_state: bool = True,
+) -> RunResult:
     store = TaskStore(workspace)
     record = store.require_confirmed()
     assert record.draft is not None
     draft = record.draft
     active_collector = collector or ExternalChromeXueqiuCollector()
-    posts, warnings = [], []
+    posts: list[NormalizedPost] = []
+    warnings: list[str] = []
     complete = True
     for user_url in draft.user_urls:
+        url = str(user_url).rstrip("/")
         collected = active_collector.collect(
             RunRequest(
                 user_url=user_url,
-                lookback_days=draft.lookback_days,
+                lookback_days=draft.user_lookback_days.get(url, draft.lookback_days),
                 qps=draft.qps,
                 authorization_confirmed=draft.authorization_confirmed,
+                as_of=until,
             )
         )
-        posts.extend(collected.posts)
+        posts.extend(
+            post
+            for post in collected.posts
+            if (since is None or post.published_at > since) and (until is None or post.published_at <= until)
+        )
         warnings.extend(collected.warnings)
         complete = complete and collected.status == "complete"
     result = RunResult(
@@ -70,5 +86,6 @@ def execute_confirmed(workspace: Path, output: Path, collector: Collector | None
 """,
         encoding="utf-8",
     )
-    store.complete()
+    if complete_state:
+        store.complete()
     return result

@@ -83,6 +83,16 @@ python3.11 -m venv .venv
 
 Schema v2 使用稳定任务 ID：`morning`（交易日 09:00）、`evening`（交易日 21:00）和 `weekly`（周日 18:00）。运行 `opinion-tracker jobs list --workspace ./data` 可在任何 Agent 中查看任务，不需要知道内部目录。
 
+```bash
+opinion-tracker jobs summary morning --workspace ./data
+opinion-tracker jobs confirm morning --workspace ./data
+opinion-tracker jobs run morning --workspace ./data --output ./reports/morning
+opinion-tracker jobs run-due --workspace ./data --output-root ./scheduled-reports
+opinion-tracker jobs complete morning --workspace ./data --verification ./reports/morning/report.json --cutoff 2026-08-07T09:00:00+08:00
+```
+
+`run-due` 会先拉取并校验个人远端配置，再运行当前到期且已确认的任务。只有最终报告核验通过后才能调用 `jobs complete`，失败或不完整任务不会推进增量检查点。
+
 ## 网易邮箱推送
 
 验证通过的日报或周报可以通过网易个人邮箱发送。客户端授权码只保存在 macOS 钥匙串，

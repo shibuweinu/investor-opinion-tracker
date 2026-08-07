@@ -58,8 +58,13 @@ class ConfigSyncService:
 
     def apply_trusted(self) -> None:
         document = self.load_remote()
-        JobStore(self.workspace).materialize(document)
+        JobStore(self.workspace).materialize(document, trusted=True)
         self._audit("auto_apply", None, document)
+
+    def ensure_local(self, *, trusted: bool) -> None:
+        if JobStore(self.workspace).list_jobs():
+            return
+        JobStore(self.workspace).materialize(self.load_remote(), trusted=trusted)
 
     def apply_trusted_document(self, document: PortableConfig) -> None:
         document = PortableConfig.model_validate(document.model_dump())

@@ -90,9 +90,9 @@ def load_auth_code(address: str) -> str:
 
 
 def build_report_message(address: str, report_path: Path, report_kind: str) -> EmailMessage:
-    if report_kind not in {"daily", "weekly", "test"}:
-        raise ValueError("邮件类型必须是 daily、weekly 或 test")
-    labels = {"daily": "日报", "weekly": "周报", "test": "测试邮件"}
+    if report_kind not in {"morning", "evening", "daily", "weekly", "test"}:
+        raise ValueError("邮件类型必须是 morning、evening、daily、weekly 或 test")
+    labels = {"morning": "早报", "evening": "晚报", "daily": "日报", "weekly": "周报", "test": "测试邮件"}
     message = EmailMessage()
     message["From"] = address
     message["To"] = address
