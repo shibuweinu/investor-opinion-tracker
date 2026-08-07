@@ -1,7 +1,9 @@
 from datetime import UTC, datetime
 
+from opinion_tracker.config_migration import migrate_portable_config
 from opinion_tracker.config_sync import ConfigSyncService
 from opinion_tracker.git_repository import GitRepository
+from opinion_tracker.job_state import JobStore
 from opinion_tracker.sync_models import PortableConfig
 from opinion_tracker.task_state import TaskStore
 
@@ -71,3 +73,18 @@ def test_trusted_apply_updates_daily_research_news_and_weekly(tmp_path):
     weekly = TaskStore(tmp_path / "data-weekly").require_confirmed().draft
     assert weekly.lookback_days == 7
     assert len(weekly.user_urls) == 2
+
+
+def test_ensure_local_repairs_legacy_jobs_without_task_drafts(tmp_path, monkeypatch):
+    root = tmp_path / "data"
+    service = ConfigSyncService(root, repository=None)
+    config = migrate_portable_config(document().model_dump(mode="json"))
+    jobs = JobStore(root)
+    jobs.materialize(config)
+    for job_id in config.report_jobs:
+        jobs.task_store(job_id).path.unlink()
+
+    monkeypatch.setattr(service, "load_remote", lambda: config)
+    service.ensure_local(trusted=False)
+
+    assert all(jobs.task_store(job_id).load().status == "draft" for job_id in config.report_jobs)

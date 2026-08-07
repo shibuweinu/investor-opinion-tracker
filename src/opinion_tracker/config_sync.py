@@ -62,8 +62,9 @@ class ConfigSyncService:
         self._audit("auto_apply", None, document)
 
     def ensure_local(self, *, trusted: bool) -> None:
-        if JobStore(self.workspace).list_jobs():
-            return
+        # Re-materializing is idempotent for an unchanged confirmed draft and
+        # also repairs partial state left by older releases (job.json without
+        # the per-job task draft).
         JobStore(self.workspace).materialize(self.load_remote(), trusted=trusted)
 
     def apply_trusted_document(self, document: PortableConfig) -> None:
