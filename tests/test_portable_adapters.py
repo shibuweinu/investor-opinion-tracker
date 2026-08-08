@@ -196,6 +196,30 @@ def test_resumable_retry_after_controls_transient_retry_delay(tmp_path):
     assert sleeps == [30, 1]
 
 
+def test_resumable_retry_jitter_cannot_exceed_wait_budget(tmp_path):
+    as_of = datetime.now(UTC)
+
+    def runner(args):
+        if args[0] == "open":
+            return ""
+        return json.dumps({"__http_status": 429, "__tracker_error": "invalid_response"})
+
+    sleeps = []
+    store = RunStateStore(tmp_path, RunIdentity(job_id="evening", cutoff=as_of))
+    store.initialize(["1"])
+    result = ExternalChromeXueqiuCollector(
+        runner=runner, sleeper=sleeps.append, jitter=lambda: 0.5
+    ).collect_resumable(
+        RunRequest(user_url="https://xueqiu.com/u/1", as_of=as_of),
+        store,
+        store.load_user("1"),
+        policy=RetryPolicy(max_wait_seconds=5.25),
+    )
+
+    assert result.status == "incomplete"
+    assert sleeps == []
+
+
 def test_external_chrome_ignores_old_pinned_and_deduplicates():
     pages = {
         1: {

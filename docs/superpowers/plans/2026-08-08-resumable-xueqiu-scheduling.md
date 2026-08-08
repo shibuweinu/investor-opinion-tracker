@@ -541,7 +541,7 @@ Enumerate only validated child directories beneath `.investor-opinion-tracker/ru
 
 - [ ] **Step 4: Update portable documentation and launchd contract**
 
-Document that schedulers call `jobs run-due`, the Agent produces verified artifacts, and then calls `jobs deliver` rather than separate `email-send` and `jobs complete`. Explain that a launch at 09:02 or 21:02 uses the configured 09:00 or 21:00 cutoff. Document the 10-minute per-account retry budget and high-frequency QPS.
+Document that schedulers call `scheduled-run`, which fails closed unless product code is clean and current, fast-forward updates and re-execs when needed, then invokes `jobs run-due`. The Agent produces verified artifacts and calls `jobs deliver` rather than separate `email-send` and `jobs complete`. Explain that a launch at 09:02 or 21:02 uses the configured 09:00 or 21:00 cutoff. Document the 10-minute per-account retry budget and high-frequency QPS.
 
 - [ ] **Step 5: Run focused and full quality gates**
 

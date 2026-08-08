@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import smtplib
+import subprocess
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Literal
@@ -24,9 +26,9 @@ from .git_repository import GitRepository
 from .job_state import JobStore
 from .onboarding import landing_text, task_summary, write_landing
 from .opinions import extract_opinions
-from .product_update import update_product, update_status
+from .product_update import ensure_latest_product, update_product, update_status
 from .reporting import write_artifacts
-from .run_state import RunIdentity, RunStateStore
+from .run_state import RunIdentity, RunStateStore, clean_old_runs
 from .scheduled_delivery import deliver_scheduled_report
 from .scheduling import schedule_hint
 from .schemas import FactEvidence, NormalizedPost, ResearchClaim, RunResult, TaskDraft, TraderProfile
@@ -117,6 +119,23 @@ def jobs_run_due(
     typer.echo(json.dumps({"due": runs}, ensure_ascii=False))
 
 
+@app.command("scheduled-run")
+def scheduled_run(
+    repository: Annotated[Path, typer.Option("--repository", exists=True, file_okay=False)],
+    workspace: Annotated[Path, typer.Option("--workspace")],
+    output_root: Annotated[Path, typer.Option("--output-root")],
+    now: Annotated[str | None, typer.Option("--now")] = None,
+) -> None:
+    """先更新并重启到最新产品代码，再执行到期任务。"""
+    try:
+        status = ensure_latest_product(repository, Path(sys.argv[0]), sys.argv[1:])
+    except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
+        raise typer.BadParameter(f"产品版本预检失败，定时任务未执行：{exc}") from exc
+    if status == "updated":
+        return
+    jobs_run_due(workspace, output_root, now)
+
+
 @jobs_app.command("complete")
 def jobs_complete(
     job_id: str,
@@ -161,6 +180,15 @@ def jobs_deliver(
             ensure_ascii=False,
         )
     )
+
+
+@jobs_app.command("clean-runs")
+def jobs_clean_runs(
+    workspace: Annotated[Path, typer.Option("--workspace")],
+    older_than_days: Annotated[int, typer.Option("--older-than-days", min=1)] = 30,
+) -> None:
+    removed = clean_old_runs(workspace, older_than_days)
+    typer.echo(json.dumps({"removed": len(removed)}, ensure_ascii=False))
 
 
 @app.command("update-check")

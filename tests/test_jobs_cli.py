@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 
 from test_config_migration import payload
 from typer.testing import CliRunner
@@ -6,7 +6,7 @@ from typer.testing import CliRunner
 from opinion_tracker.cli import app
 from opinion_tracker.config_migration import migrate_portable_config
 from opinion_tracker.job_state import JobStore
-from opinion_tracker.run_state import DeliveryReceipt
+from opinion_tracker.run_state import DeliveryReceipt, RunIdentity, RunStateStore
 from opinion_tracker.schemas import RunResult
 from opinion_tracker.sync_preflight import PreflightResult
 
@@ -123,3 +123,67 @@ def test_jobs_deliver_uses_stable_job_and_cutoff(tmp_path, monkeypatch):
             verification,
         )
     ]
+
+
+def test_scheduled_run_checks_product_before_running_due(tmp_path, monkeypatch):
+    calls = []
+
+    def fake_ensure(repository, executable, argv):
+        calls.append(("preflight", repository, executable, argv))
+        return "current"
+
+    def fake_run_due(workspace, output_root, now):
+        calls.append(("run", workspace, output_root, now))
+
+    monkeypatch.setattr("opinion_tracker.cli.ensure_latest_product", fake_ensure, raising=False)
+    monkeypatch.setattr("opinion_tracker.cli.jobs_run_due", fake_run_due)
+    repository = tmp_path / "product"
+    repository.mkdir()
+    result = runner.invoke(
+        app,
+        [
+            "scheduled-run",
+            "--repository",
+            str(repository),
+            "--workspace",
+            str(tmp_path / "data"),
+            "--output-root",
+            str(tmp_path / "reports"),
+            "--now",
+            "2026-08-07T21:02:00+08:00",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert calls[0][0:2] == ("preflight", repository)
+    assert calls[1] == (
+        "run",
+        tmp_path / "data",
+        tmp_path / "reports",
+        "2026-08-07T21:02:00+08:00",
+    )
+
+
+def test_clean_runs_removes_only_old_validated_run_state(tmp_path):
+    now = datetime.now(UTC)
+    old = RunStateStore(tmp_path, RunIdentity(job_id="evening", cutoff=now - timedelta(days=31)))
+    recent = RunStateStore(tmp_path, RunIdentity(job_id="evening", cutoff=now - timedelta(days=1)))
+    old.initialize(["2292705444"])
+    recent.initialize(["2292705444"])
+    invalid = tmp_path / ".investor-opinion-tracker" / "runs" / "not-a-run"
+    invalid.mkdir()
+    (invalid / "run.json").write_text("{}", encoding="utf-8")
+    report = tmp_path / "reports" / "report.md"
+    report.parent.mkdir()
+    report.write_text("keep", encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        ["jobs", "clean-runs", "--workspace", str(tmp_path), "--older-than-days", "30"],
+    )
+
+    assert result.exit_code == 0
+    assert not old.root.exists()
+    assert recent.root.exists()
+    assert invalid.exists()
+    assert report.exists()

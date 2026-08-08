@@ -18,9 +18,9 @@ description: 抓取已获授权的雪球博主时间线，跟踪观点变化，�
 7. 显式股票代码优先；行业映射必须注明推导。A股行情使用内置 `TdxClient`，无需安装 `tdx-api` Skill；AKShare 用于 ETF、港股及回退。证据按 A/B/C/D 分级。
 8. 仓位建议默认关闭。只有任务明确开启且账户规模、入场价、止损条件齐全时才计算；数据不完整时只给观察项。
 9. 报告完成后提示用户可以启动定时任务，但不得未经另一次确认自行创建。
-10. 远端 `trusted_auto_apply` 只是偏好；每台设备必须明确建立本机信任。定时任务运行前检查最新配置，身份、私有状态、Schema 或历史异常时不得自动应用。
+10. 远端 `trusted_auto_apply` 只是偏好；每台设备必须明确建立本机信任。定时任务先通过 `scheduled-run` 检查产品工作树和 `origin/main`；仅允许干净工作树 fast-forward，更新后必须重新安装并重启。随后检查最新个人配置。任一预检失败均不得抓取或发信。
 11. Schema v2 通过 `jobs list` 使用 `morning`、`evening`、`weekly` 稳定任务 ID。产品功能更新使用 `update-check`/`update`，个人配置更新使用 `config-preflight`，不得混用或覆盖用户配置。
-12. 定时入口必须调用 `jobs run-due`，它先完成远端配置预检。Agent 完成语义与行情核验并确认 `report.json` 可交付后，才调用 `jobs complete` 推进检查点；早报失败时晚报补抓，晚报失败时下一早报补抓。
+12. 定时入口必须调用 `scheduled-run --repository <产品仓库>`；不要绕过它直接调 `jobs run-due`。启动延迟 15 分钟内仍使用计划截止时间。分页每页落盘，405/429/临时 5xx 在单账号 10 分钟预算内恢复；研究账号 QPS=1，资讯号 QPS=0.4。Agent 完成语义与行情核验后调用 `jobs deliver`，由成功回执幂等发信并推进检查点；不得再拆成 `email-send` 与 `jobs complete`。
 
 ## 调用方式
 

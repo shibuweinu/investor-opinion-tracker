@@ -3,7 +3,8 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-from datetime import UTC, datetime
+import shutil
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Literal
 
@@ -229,3 +230,36 @@ class RunLock:
             except FileNotFoundError:
                 pass
             self.acquired = False
+
+
+def clean_old_runs(
+    workspace: Path,
+    older_than_days: int,
+    *,
+    now: datetime | None = None,
+) -> list[Path]:
+    """Delete only validated run-state directories older than the retention period."""
+    if older_than_days < 1:
+        raise ValueError("运行状态保留天数必须至少为 1")
+    runs_root = workspace / ".investor-opinion-tracker" / "runs"
+    if not runs_root.is_dir():
+        return []
+    threshold = (now or datetime.now(UTC)) - timedelta(days=older_than_days)
+    removed: list[Path] = []
+    for child in runs_root.iterdir():
+        if child.is_symlink() or not child.is_dir():
+            continue
+        state_path = child / "run.json"
+        try:
+            state = ScheduledRunState.model_validate_json(state_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        identity = RunIdentity(job_id=state.job_id, cutoff=state.cutoff)
+        if child.name != identity.directory_name or state.run_id != identity.run_id:
+            continue
+        if state.cutoff.tzinfo is None or threshold.tzinfo is None:
+            continue
+        if state.cutoff <= threshold:
+            shutil.rmtree(child)
+            removed.append(child)
+    return removed

@@ -226,6 +226,11 @@ class ExternalChromeXueqiuCollector:
                     delay = retry_delay(
                         retry_attempt, self._retry_after(payload), remaining
                     )
+                    sleep_for = None
+                    if delay is not None:
+                        sleep_for = delay + max(0.0, self.jitter())
+                        if sleep_for > remaining:
+                            delay = None
                     status = int(payload["__http_status"])
                     if delay is None:
                         warning = (
@@ -246,8 +251,9 @@ class ExternalChromeXueqiuCollector:
                     user_state.last_error = f"雪球接口状态 {status}，等待后重试"
                     user_state.last_http_status = status
                     store.save_user(user_state)
-                    self.sleeper(delay + max(0.0, self.jitter()))
-                    waited += delay
+                    assert sleep_for is not None
+                    self.sleeper(sleep_for)
+                    waited += sleep_for
                     retry_attempt += 1
                     self.runner(["open", str(request.user_url)])
                     continue

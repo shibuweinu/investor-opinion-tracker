@@ -63,7 +63,7 @@ cd investor-opinion-tracker
 - 未填写画像：混合交易风格，单笔计划亏损 0.5%；
 - 数据不完整时只列观察项，不输出主动仓位；
 - 首份报告后仅提示可启动定时任务，未经确认不创建；
-- 日报建议交易日 18:30，周报建议周六 10:00。
+- 早报交易日 09:00、晚报交易日 21:00、周报周日 18:00（`Asia/Shanghai`）。
 
 ## 数据源优先级
 
@@ -89,17 +89,29 @@ cd investor-opinion-tracker
 
 两类更新彼此独立：`opinion-tracker update-check` 检查产品仓库的新功能，`opinion-tracker update --yes` 仅以 fast-forward 方式更新产品代码，不修改个人配置；`config-preflight` 拉取个人私有配置。Schema 较新时旧版本会停止覆盖并提示先更新产品。
 
+定时器应调用统一入口 `scheduled-run`，而不是直接调用 `jobs run-due`。它在抓取前要求产品工作树
+干净、拉取 `origin/main` 并确认当前提交为最新；存在可快进更新时自动更新、重新安装并重启到新代码，
+然后才执行个人配置预检。网络失败、本地改动、分叉或安装失败均会停止本轮任务，不抓取、不发信。
+因此新设备首次克隆并运行 `bootstrap.sh` 后也能沿用同一更新机制；本机路径、浏览器登录态、钥匙串
+和调度器仍不会进入仓库。
+
 Schema v2 使用稳定任务 ID：`morning`（交易日 09:00）、`evening`（交易日 21:00）和 `weekly`（周日 18:00）。运行 `opinion-tracker jobs list --workspace ./data` 可在任何 Agent 中查看任务，不需要知道内部目录。
 
 ```bash
 opinion-tracker jobs summary morning --workspace ./data
 opinion-tracker jobs confirm morning --workspace ./data
 opinion-tracker jobs run morning --workspace ./data --output ./reports/morning
-opinion-tracker jobs run-due --workspace ./data --output-root ./scheduled-reports
-opinion-tracker jobs complete morning --workspace ./data --verification ./reports/morning/report.json --cutoff 2026-08-07T09:00:00+08:00
+opinion-tracker scheduled-run --repository "$PWD" --workspace ./data --output-root ./scheduled-reports
+opinion-tracker jobs deliver morning --workspace ./data --cutoff 2026-08-07T09:00:00+08:00 \
+  --address user@163.com --report ./reports/morning/report.md \
+  --verification ./reports/morning/report.json
+opinion-tracker jobs clean-runs --workspace ./data --older-than-days 30
 ```
 
-`run-due` 会先拉取并校验个人远端配置，再运行当前到期且已确认的任务。只有最终报告核验通过后才能调用 `jobs complete`，失败或不完整任务不会推进增量检查点。
+`scheduled-run` 依次执行产品版本预检、个人远端配置预检和到期任务。09:02/21:02 等 15 分钟内的
+延迟启动仍使用 09:00/21:00 计划截止时间。分页状态按稳定运行 ID 持久化，405/429/临时 5xx 在
+单账号最多 10 分钟预算内重试；普通账号 QPS=1，`auxiliary_news` 默认 QPS=0.4。最终报告核验后
+使用 `jobs deliver` 幂等发送，SMTP 成功回执存在后才推进检查点。失败或不完整任务不会推进。
 
 ## 网易邮箱推送
 
