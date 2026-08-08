@@ -9,7 +9,7 @@ from .schemas import RunResult, TraderProfile
 
 def render_markdown(result: RunResult, profile: TraderProfile, generated_at: datetime) -> str:
     completeness = "完整" if result.status == "complete" else "不完整（仅供观察，不给出主动仓位）"
-    candidate_cards = []
+    candidate_cards: list[str] = []
     for item in result.candidates:
         state = item.state if result.status == "complete" else "watch"
         if state == "avoid" or len(candidate_cards) >= 5:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from datetime import datetime
-from typing import Protocol
+from typing import Literal, Protocol
 
 from .market import TdxClient, TdxDailyBar, TdxQuote
 from .schemas import (
@@ -127,7 +127,7 @@ def verify_research(
     if uncovered_claims:
         errors.append(f"缺少独立事实证据的事实主张：{', '.join(uncovered_claims)}")
     covered_count = len(formal_ids) - len(uncovered_opinions)
-    semantic_status = (
+    semantic_status: Literal["verified", "partially_verified", "unverified"] = (
         "verified"
         if not uncovered_opinions
         else "partially_verified"
@@ -135,7 +135,7 @@ def verify_research(
         else "unverified"
     )
     supported_factual_count = len(factual_ids) - len(uncovered_claims)
-    fact_status = (
+    fact_status: Literal["verified", "partially_verified", "unverified"] = (
         "verified"
         if not uncovered_claims
         else "partially_verified"
