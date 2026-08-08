@@ -37,6 +37,7 @@ class TaskDraft(BaseModel):
     authorization_confirmed: bool = True
     include_position_sizing: bool = False
     user_lookback_days: dict[str, int] = Field(default_factory=dict)
+    user_qps: dict[str, float] = Field(default_factory=dict)
 
 
 class NormalizedPost(BaseModel):

@@ -3,10 +3,11 @@ from __future__ import annotations
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol, cast
 
 from .collectors.external_chrome import ExternalChromeXueqiuCollector
 from .evidence import build_evidence_pack
+from .run_state import RunLock, RunStateStore
 from .schemas import CollectionResult, NormalizedPost, RunRequest, RunResult
 from .task_state import TaskStore
 
@@ -23,37 +24,86 @@ def execute_confirmed(
     since: datetime | None = None,
     until: datetime | None = None,
     complete_state: bool = True,
+    run_store: RunStateStore | None = None,
 ) -> RunResult:
     store = TaskStore(workspace)
     record = store.require_confirmed()
     assert record.draft is not None
     draft = record.draft
     active_collector = collector or ExternalChromeXueqiuCollector()
-    posts: list[NormalizedPost] = []
-    warnings: list[str] = []
-    complete = True
-    for user_url in draft.user_urls:
-        url = str(user_url).rstrip("/")
-        collected = active_collector.collect(
-            RunRequest(
+    user_ids = [str(url).rstrip("/").split("/")[-1] for url in draft.user_urls]
+
+    def collect_users() -> tuple[list[NormalizedPost], list[str], bool]:
+        if run_store is not None:
+            run_store.initialize(user_ids)
+        collected_posts: list[NormalizedPost] = []
+        collected_warnings: list[str] = []
+        all_complete = True
+        for user_url in draft.user_urls:
+            url = str(user_url).rstrip("/")
+            user_id = url.split("/")[-1]
+            if run_store is not None and run_store.load_user(user_id).status == "complete":
+                continue
+            request = RunRequest(
                 user_url=user_url,
                 lookback_days=draft.user_lookback_days.get(url, draft.lookback_days),
-                qps=draft.qps,
+                qps=draft.user_qps.get(url, draft.qps),
                 authorization_confirmed=draft.authorization_confirmed,
                 as_of=until,
                 since=since,
             )
-        )
-        posts.extend(
+            resumable = cast(Any, getattr(active_collector, "collect_resumable", None))
+            if run_store is not None and callable(resumable):
+                collected = cast(
+                    CollectionResult,
+                    resumable(request, run_store, run_store.load_user(user_id)),
+                )
+            else:
+                collected = active_collector.collect(request)
+                if run_store is not None:
+                    run_store.merge_posts(collected.posts)
+                    user_state = run_store.load_user(user_id)
+                    user_state.status = (
+                        "complete" if collected.status == "complete" else "incomplete"
+                    )
+                    user_state.last_error = (
+                        "；".join(collected.warnings) if collected.warnings else None
+                    )
+                    if collected.next_cursor and collected.next_cursor.isdigit():
+                        user_state.next_page = int(collected.next_cursor)
+                    run_store.save_user(user_state)
+            collected_posts.extend(collected.posts)
+            collected_warnings.extend(collected.warnings)
+            all_complete = all_complete and collected.status == "complete"
+            if any(
+                "雪球访问验证" in warning or "雪球登录失效" in warning
+                for warning in collected.warnings
+            ):
+                collected_warnings.append("已停止后续账号采集，避免扩大风控或重复触发验证")
+                all_complete = False
+                break
+        if run_store is not None:
+            collected_posts = run_store.posts()
+            all_complete = all(
+                run_store.load_user(user_id).status == "complete" for user_id in user_ids
+            )
+            run_state = run_store.load()
+            run_state.status = "complete" if all_complete else "incomplete"
+            run_state.warnings = collected_warnings
+            run_store.save(run_state)
+        filtered = [
             post
-            for post in collected.posts
-            if (since is None or post.published_at > since) and (until is None or post.published_at <= until)
-        )
-        warnings.extend(collected.warnings)
-        complete = complete and collected.status == "complete"
-        if any("雪球访问验证" in warning or "雪球登录失效" in warning for warning in collected.warnings):
-            warnings.append("已停止后续账号采集，避免扩大风控或重复触发验证")
-            break
+            for post in collected_posts
+            if (since is None or post.published_at > since)
+            and (until is None or post.published_at <= until)
+        ]
+        return filtered, collected_warnings, all_complete
+
+    if run_store is not None:
+        with RunLock(run_store):
+            posts, warnings, complete = collect_users()
+    else:
+        posts, warnings, complete = collect_users()
     result = RunResult(
         status="complete" if complete else "incomplete",
         posts_collected=len(posts),

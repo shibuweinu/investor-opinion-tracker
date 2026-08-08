@@ -21,7 +21,11 @@ class TaskRecord(BaseModel):
 
 
 def task_fingerprint(draft: TaskDraft) -> str:
-    content = json.dumps(draft.model_dump(mode="json"), sort_keys=True, separators=(",", ":"))
+    content = json.dumps(
+        draft.model_dump(mode="json", exclude={"user_qps"}),
+        sort_keys=True,
+        separators=(",", ":"),
+    )
     return hashlib.sha256(content.encode()).hexdigest()
 
 
@@ -43,7 +47,8 @@ class TaskStore:
         previous = self.load()
         fingerprint = task_fingerprint(draft)
         if previous.status == "confirmed" and previous.fingerprint == fingerprint:
-            return previous
+            previous.draft = draft
+            return self._write(previous)
         return self._write(TaskRecord(status="draft", draft=draft))
 
     def confirm(self) -> TaskRecord:

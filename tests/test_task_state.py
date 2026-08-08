@@ -43,3 +43,18 @@ def test_position_option_defaults_off_and_invalidates_confirmation(tmp_path):
     store.save_draft(draft(include_position_sizing=True))
     with pytest.raises(PermissionError, match="重新确认"):
         store.require_confirmed()
+
+
+def test_execution_qps_tuning_updates_confirmed_task_without_reconfirmation(tmp_path):
+    store = TaskStore(tmp_path)
+    store.save_draft(draft())
+    store.confirm()
+
+    updated = store.save_draft(
+        draft(user_qps={"https://xueqiu.com/u/2292705444": 0.4})
+    )
+
+    assert updated.status == "confirmed"
+    assert store.require_confirmed().draft.user_qps == {
+        "https://xueqiu.com/u/2292705444": 0.4
+    }

@@ -7,6 +7,7 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from .execution import Collector, execute_confirmed
+from .run_state import RunIdentity, RunStateStore
 from .schemas import RunResult, TaskDraft
 from .sync_models import PortableConfigV2, ReportJob
 from .task_state import TaskStore
@@ -19,6 +20,7 @@ class JobWindow(BaseModel):
 
 class JobStore:
     def __init__(self, workspace: Path):
+        self.workspace = workspace
         self.root = workspace / ".investor-opinion-tracker" / "jobs"
 
     def materialize(self, config: PortableConfigV2, *, trusted: bool = False) -> None:
@@ -31,6 +33,10 @@ class JobStore:
                 str(account.url).rstrip("/"): job.lookback_days_by_role[account.role]
                 for account in config.tracked_accounts
             }
+            user_qps = {
+                str(account.url).rstrip("/"): 0.4 if account.role == "auxiliary_news" else 1.0
+                for account in config.tracked_accounts
+            }
             draft = TaskDraft.model_validate(
                 {
                     "user_urls": urls,
@@ -40,6 +46,7 @@ class JobStore:
                     "trader_profile": config.trader_profile,
                     "include_position_sizing": config.report_preferences.include_position_sizing,
                     "user_lookback_days": lookbacks,
+                    "user_qps": user_qps,
                 }
             )
             task_store = TaskStore(directory)
@@ -91,8 +98,17 @@ class JobStore:
         self, job_id: str, output: Path, until: datetime, collector: Collector | None = None
     ) -> RunResult:
         window = self.window(job_id, until)
+        run_store = RunStateStore(
+            self.workspace, RunIdentity(job_id=job_id, cutoff=until)
+        )
         result = execute_confirmed(
-            self.root / job_id, output, collector, since=window.since, until=until, complete_state=False
+            self.root / job_id,
+            output,
+            collector,
+            since=window.since,
+            until=until,
+            complete_state=False,
+            run_store=run_store,
         )
         analyze = output / "ANALYZE.md"
         context = (
