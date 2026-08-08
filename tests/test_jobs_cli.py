@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import datetime
 
 from test_config_migration import payload
 from typer.testing import CliRunner
@@ -6,6 +6,8 @@ from typer.testing import CliRunner
 from opinion_tracker.cli import app
 from opinion_tracker.config_migration import migrate_portable_config
 from opinion_tracker.job_state import JobStore
+from opinion_tracker.schemas import RunResult
+from opinion_tracker.sync_preflight import PreflightResult
 
 runner = CliRunner()
 
@@ -33,5 +35,38 @@ def test_job_summary_and_confirmation(tmp_path):
 def test_due_jobs_use_portable_schedule(tmp_path):
     store = JobStore(tmp_path)
     store.materialize(migrate_portable_config(payload()))
-    due = store.due(datetime(2026, 8, 7, 9, tzinfo=UTC))
+    due = store.due(datetime.fromisoformat("2026-08-07T09:00:00+08:00"))
     assert [job.job_id for job in due] == ["morning"]
+
+
+def test_run_due_uses_scheduled_cutoff_not_actual_start(tmp_path, monkeypatch):
+    store = JobStore(tmp_path)
+    store.materialize(migrate_portable_config(payload()))
+    store.confirm("evening")
+    captured = []
+    monkeypatch.setattr(
+        "opinion_tracker.cli._perform_config_preflight",
+        lambda workspace: PreflightResult("run"),
+    )
+
+    def capture_run(self, job_id, output, until, collector=None):
+        captured.append(until)
+        return RunResult(status="complete", posts_collected=0)
+
+    monkeypatch.setattr(JobStore, "run", capture_run)
+    result = runner.invoke(
+        app,
+        [
+            "jobs",
+            "run-due",
+            "--workspace",
+            str(tmp_path),
+            "--output-root",
+            str(tmp_path / "out"),
+            "--now",
+            "2026-08-07T21:02:00+08:00",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert captured == [datetime.fromisoformat("2026-08-07T21:00:00+08:00")]

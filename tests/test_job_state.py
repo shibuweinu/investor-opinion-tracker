@@ -34,3 +34,22 @@ def test_failure_does_not_advance_checkpoint(tmp_path):
     assert store.window("morning", cutoff).since is None
     store.mark_success("morning", cutoff)
     assert store.window("evening", cutoff).since == cutoff
+
+
+def test_due_run_maps_2102_start_to_2100_cutoff(tmp_path):
+    store = JobStore(tmp_path)
+    store.materialize(migrate_portable_config(payload()))
+
+    due = store.due_runs(datetime.fromisoformat("2026-08-07T21:02:00+08:00"))
+
+    assert due[0].job.job_id == "evening"
+    assert due[0].scheduled_cutoff == datetime.fromisoformat(
+        "2026-08-07T21:00:00+08:00"
+    )
+
+
+def test_due_run_rejects_start_after_fifteen_minute_grace(tmp_path):
+    store = JobStore(tmp_path)
+    store.materialize(migrate_portable_config(payload()))
+
+    assert store.due_runs(datetime.fromisoformat("2026-08-07T21:16:00+08:00")) == []

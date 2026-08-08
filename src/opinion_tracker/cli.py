@@ -95,12 +95,24 @@ def jobs_run_due(
     if preflight.action == "confirmation_required":
         typer.echo(preflight.message, err=True)
         raise typer.Exit(code=2)
-    cutoff = _parse_now(now)
+    actual_start = _parse_now(now)
     store = JobStore(workspace)
-    due = store.due(cutoff)
-    for job in due:
-        store.run(job.job_id, output_root / cutoff.date().isoformat() / job.job_id, cutoff)
-    typer.echo(json.dumps({"due": [job.job_id for job in due]}, ensure_ascii=False))
+    due = store.due_runs(actual_start)
+    runs = []
+    for item in due:
+        cutoff = item.scheduled_cutoff
+        output = output_root / cutoff.date().isoformat() / item.job.job_id
+        result = store.run(item.job.job_id, output, cutoff)
+        runs.append(
+            {
+                "job_id": item.job.job_id,
+                "run_id": f"{item.job.job_id}@{cutoff.isoformat()}",
+                "scheduled_cutoff": cutoff.isoformat(),
+                "output": str(output),
+                "status": result.status,
+            }
+        )
+    typer.echo(json.dumps({"due": runs}, ensure_ascii=False))
 
 
 @jobs_app.command("complete")

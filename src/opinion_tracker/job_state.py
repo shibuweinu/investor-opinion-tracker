@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel
 
@@ -16,6 +17,11 @@ from .task_state import TaskStore
 class JobWindow(BaseModel):
     since: datetime | None
     until: datetime
+
+
+class DueJob(BaseModel):
+    job: ReportJob
+    scheduled_cutoff: datetime
 
 
 class JobStore:
@@ -67,12 +73,27 @@ class JobStore:
         return ReportJob.model_validate_json(path.read_text())
 
     def due(self, now: datetime) -> list[ReportJob]:
-        weekday = (now.weekday() + 1) % 7
-        return [
-            job
-            for job in self.list_jobs()
-            if job.enabled and weekday in job.weekdays and job.hour == now.hour and job.minute == now.minute
-        ]
+        return [item.job for item in self.due_runs(now, grace_minutes=0)]
+
+    def due_runs(self, now: datetime, *, grace_minutes: int = 15) -> list[DueJob]:
+        if now.tzinfo is None or now.utcoffset() is None:
+            raise ValueError("调度时间必须包含时区")
+        due = []
+        for job in self.list_jobs():
+            timezone = ZoneInfo(job.timezone)
+            local_now = now.astimezone(timezone)
+            scheduled_cutoff = local_now.replace(
+                hour=job.hour, minute=job.minute, second=0, microsecond=0
+            )
+            weekday = (scheduled_cutoff.weekday() + 1) % 7
+            delay = local_now - scheduled_cutoff
+            if (
+                job.enabled
+                and weekday in job.weekdays
+                and timedelta(0) <= delay <= timedelta(minutes=grace_minutes)
+            ):
+                due.append(DueJob(job=job, scheduled_cutoff=scheduled_cutoff))
+        return due
 
     def window(self, job_id: str, until: datetime) -> JobWindow:
         job = ReportJob.model_validate_json((self.root / job_id / "job.json").read_text())
