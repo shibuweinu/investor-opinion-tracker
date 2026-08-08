@@ -26,6 +26,8 @@ from .onboarding import landing_text, task_summary, write_landing
 from .opinions import extract_opinions
 from .product_update import update_product, update_status
 from .reporting import write_artifacts
+from .run_state import RunIdentity, RunStateStore
+from .scheduled_delivery import deliver_scheduled_report
 from .scheduling import schedule_hint
 from .schemas import FactEvidence, NormalizedPost, ResearchClaim, RunResult, TaskDraft, TraderProfile
 from .scoring import score_candidate
@@ -125,6 +127,40 @@ def jobs_complete(
     require_verified_result(verification)
     JobStore(workspace).complete(job_id, datetime.fromisoformat(cutoff), verified=True)
     typer.echo(f"{job_id} 检查点已推进")
+
+
+@jobs_app.command("deliver")
+def jobs_deliver(
+    job_id: str,
+    workspace: Annotated[Path, typer.Option("--workspace")],
+    cutoff: Annotated[str, typer.Option("--cutoff")],
+    address: Annotated[str, typer.Option("--address")],
+    report: Annotated[Path, typer.Option("--report", exists=True, readable=True)],
+    verification: Annotated[
+        Path, typer.Option("--verification", exists=True, readable=True)
+    ],
+) -> None:
+    """核验并幂等投递定时报告，成功后推进报告检查点。"""
+    scheduled_cutoff = datetime.fromisoformat(cutoff)
+    run_store = RunStateStore(
+        workspace, RunIdentity(job_id=job_id, cutoff=scheduled_cutoff)
+    )
+    try:
+        receipt = deliver_scheduled_report(
+            JobStore(workspace), run_store, address, report, verification
+        )
+    except (OSError, RuntimeError, ValueError, smtplib.SMTPException) as exc:
+        raise typer.BadParameter(f"定时报告投递失败：{exc}") from exc
+    typer.echo(
+        json.dumps(
+            {
+                "run_id": receipt.run_id,
+                "status": receipt.status,
+                "message_id": receipt.message_id,
+            },
+            ensure_ascii=False,
+        )
+    )
 
 
 @app.command("update-check")

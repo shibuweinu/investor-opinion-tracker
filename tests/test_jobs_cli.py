@@ -6,6 +6,7 @@ from typer.testing import CliRunner
 from opinion_tracker.cli import app
 from opinion_tracker.config_migration import migrate_portable_config
 from opinion_tracker.job_state import JobStore
+from opinion_tracker.run_state import DeliveryReceipt
 from opinion_tracker.schemas import RunResult
 from opinion_tracker.sync_preflight import PreflightResult
 
@@ -70,3 +71,55 @@ def test_run_due_uses_scheduled_cutoff_not_actual_start(tmp_path, monkeypatch):
 
     assert result.exit_code == 0
     assert captured == [datetime.fromisoformat("2026-08-07T21:00:00+08:00")]
+
+
+def test_jobs_deliver_uses_stable_job_and_cutoff(tmp_path, monkeypatch):
+    cutoff = datetime.fromisoformat("2026-08-07T21:00:00+08:00")
+    report = tmp_path / "report.md"
+    report.write_text("# report", encoding="utf-8")
+    verification = tmp_path / "report.json"
+    verification.write_text("{}", encoding="utf-8")
+    captured = []
+
+    def fake_deliver(job_store, run_store, address, report_path, verification_path):
+        captured.append((run_store.identity.run_id, address, report_path, verification_path))
+        return DeliveryReceipt(
+            run_id=run_store.identity.run_id,
+            job_id="evening",
+            cutoff=cutoff,
+            address=address,
+            message_id="<stable@example>",
+            report_sha256="a" * 64,
+        )
+
+    monkeypatch.setattr(
+        "opinion_tracker.cli.deliver_scheduled_report", fake_deliver, raising=False
+    )
+    result = runner.invoke(
+        app,
+        [
+            "jobs",
+            "deliver",
+            "evening",
+            "--workspace",
+            str(tmp_path),
+            "--cutoff",
+            cutoff.isoformat(),
+            "--address",
+            "user@163.com",
+            "--report",
+            str(report),
+            "--verification",
+            str(verification),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert captured == [
+        (
+            "evening@2026-08-07T21:00:00+08:00",
+            "user@163.com",
+            report,
+            verification,
+        )
+    ]

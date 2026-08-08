@@ -83,3 +83,14 @@ def test_require_verified_result_rejects_unverified_report(tmp_path: Path, paylo
     verification.write_text(payload, encoding="utf-8")
     with pytest.raises(ValueError, match="核验|有效"):
         require_verified_result(verification)
+
+
+def test_report_message_accepts_stable_message_id(tmp_path: Path) -> None:
+    report = tmp_path / "report.md"
+    report.write_text("# report", encoding="utf-8")
+
+    message = build_report_message(
+        "user@163.com", report, "evening", message_id="<run@example>"
+    )
+
+    assert message["Message-ID"] == "<run@example>"

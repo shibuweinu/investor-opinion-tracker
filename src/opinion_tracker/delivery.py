@@ -89,7 +89,12 @@ def load_auth_code(address: str) -> str:
     return completed.stdout.strip()
 
 
-def build_report_message(address: str, report_path: Path, report_kind: str) -> EmailMessage:
+def build_report_message(
+    address: str,
+    report_path: Path,
+    report_kind: str,
+    message_id: str | None = None,
+) -> EmailMessage:
     if report_kind not in {"morning", "evening", "daily", "weekly", "test"}:
         raise ValueError("邮件类型必须是 morning、evening、daily、weekly 或 test")
     labels = {"morning": "早报", "evening": "晚报", "daily": "日报", "weekly": "周报", "test": "测试邮件"}
@@ -97,6 +102,8 @@ def build_report_message(address: str, report_path: Path, report_kind: str) -> E
     message["From"] = address
     message["To"] = address
     message["Subject"] = f"[投资者观点跟踪] {labels[report_kind]}"
+    if message_id is not None:
+        message["Message-ID"] = message_id
     if report_kind == "test":
         message.set_content("网易邮箱推送通道配置成功。后续验证通过的日报和周报将发送到此邮箱。")
         return message
@@ -120,10 +127,18 @@ def send_message(address: str, message: EmailMessage, timeout_seconds: float = 2
         smtp.send_message(message)
 
 
-def send_report(address: str, report_path: Path, report_kind: str) -> None:
+def send_report(
+    address: str,
+    report_path: Path,
+    report_kind: str,
+    message_id: str | None = None,
+) -> None:
     if not report_path.is_file():
         raise FileNotFoundError(f"报告不存在：{report_path}")
-    send_message(address, build_report_message(address, report_path, report_kind))
+    send_message(
+        address,
+        build_report_message(address, report_path, report_kind, message_id=message_id),
+    )
 
 
 def require_verified_result(verification_path: Path) -> None:
