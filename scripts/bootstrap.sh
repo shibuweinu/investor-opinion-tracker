@@ -9,7 +9,7 @@ if ! command -v "$python_bin" >/dev/null 2>&1; then
 fi
 
 "$python_bin" -c 'import sys; assert sys.version_info >= (3, 11), "需要 Python 3.11 或更高版本"'
-"$python_bin" -m venv "$project_dir/.venv"
+"$python_bin" -m venv --clear "$project_dir/.venv"
 "$project_dir/.venv/bin/python" -m pip install --upgrade pip setuptools wheel
 "$project_dir/.venv/bin/python" -m pip install -e "$project_dir[mcp]"
 "$project_dir/.venv/bin/opinion-tracker" doctor

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 import subprocess
-import sys
 from collections.abc import Callable
 from pathlib import Path
 from typing import Literal
@@ -36,10 +35,10 @@ def update_product(repository: Path) -> None:
 
 
 def install_product(repository: Path) -> None:
-    subprocess.run(
-        [sys.executable, "-m", "pip", "install", "-e", f"{repository.resolve()}[mcp]"],
-        check=True,
-    )
+    bootstrap = repository.resolve() / "scripts" / "bootstrap.sh"
+    if not bootstrap.is_file():
+        raise RuntimeError("产品仓库缺少 scripts/bootstrap.sh，拒绝自动安装")
+    subprocess.run([str(bootstrap)], cwd=repository, check=True)
 
 
 def ensure_latest_product(

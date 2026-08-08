@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from opinion_tracker.product_update import ensure_latest_product, update_status
+from opinion_tracker.product_update import ensure_latest_product, install_product, update_status
 
 
 def test_scheduled_product_preflight_does_nothing_when_current(monkeypatch, tmp_path):
@@ -111,3 +111,18 @@ def test_update_status_rejects_ahead_or_diverged_branch(monkeypatch, tmp_path):
 
     with pytest.raises(RuntimeError, match="领先或已经分叉"):
         update_status(tmp_path)
+
+
+def test_install_product_uses_self_healing_bootstrap(monkeypatch, tmp_path):
+    calls = []
+    script = tmp_path / "scripts" / "bootstrap.sh"
+    script.parent.mkdir()
+    script.touch()
+    monkeypatch.setattr(
+        "opinion_tracker.product_update.subprocess.run",
+        lambda args, **kwargs: calls.append((args, kwargs)),
+    )
+
+    install_product(tmp_path)
+
+    assert calls == [([str(script)], {"cwd": tmp_path, "check": True})]

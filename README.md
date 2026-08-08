@@ -22,7 +22,9 @@ cd investor-opinion-tracker
 .venv/bin/opinion-tracker init --workspace ./data --no-interactive
 ```
 
-`bootstrap.sh` 会先升级虚拟环境内的 pip/setuptools，兼容 macOS 自带的旧 pip；不会修改系统 Python。也可以设置 `PYTHON_BIN` 指定 Python 3.11+。
+`bootstrap.sh` 会重建项目自己的 `.venv`，再升级其中的 pip/setuptools，可自愈损坏或残留的包元数据；
+不会修改系统 Python。也可以设置 `PYTHON_BIN` 指定 Python 3.11+。项目运行依赖应通过
+`pyproject.toml` 声明，不要把仅存在于 `.venv` 的手工安装包当作持久配置。
 
 `init --no-interactive` 会生成初始化 landing，但不会等待输入、创建默认博主或开始抓取。Agent 接下来询问用户需求，调用 `onboard` 保存草稿，以 `task-summary` 展示完整摘要；只有用户明确确认后才调用 `task-confirm` 和 `run`。示例 URL 永远不是默认目标。
 
